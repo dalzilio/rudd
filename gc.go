@@ -37,18 +37,18 @@ type gcStat struct {
 // Reference counting is done on externaly referenced nodes only and the count
 // for a specific node can and must be increased using this function to avoid
 // loosing the node during garbage collection.
-func (b *BDD) AddRef(n int) int {
-	if n < 2 {
+func (b *buddy) AddRef(n Node) Node {
+	if *n < 2 {
 		return n
 	}
-	if n >= len(b.nodes) {
+	if *n >= len(b.nodes) {
 		return n
 	}
-	if b.nodes[n].low == -1 {
+	if b.nodes[*n].low == -1 {
 		return n
 	}
-	if b.nodes[n].refcou < _MAXREFCOUNT {
-		b.nodes[n].refcou++
+	if b.nodes[*n].refcou < _MAXREFCOUNT {
+		b.nodes[*n].refcou++
 	}
 	return n
 }
@@ -60,19 +60,19 @@ func (b *BDD) AddRef(n int) int {
 // Like with AddRef, reference counting is done on externaly referenced nodes
 // only and the count for a specific node can and must be decreased using this
 // function to make it possible to reclaim the node during garbage collection.
-func (b *BDD) DelRef(n int) int {
-	if n >= len(b.nodes) {
+func (b *buddy) DelRef(n Node) Node {
+	if *n >= len(b.nodes) {
 		return n
 	}
-	if b.nodes[n].low == -1 {
+	if b.nodes[*n].low == -1 {
 		return n
 	}
 	/* if the following line is present, fails there much earlier */
-	if b.nodes[n].refcou <= 0 {
+	if b.nodes[*n].refcou <= 0 {
 		return n
 	}
-	if b.nodes[n].refcou < _MAXREFCOUNT {
-		b.nodes[n].refcou--
+	if b.nodes[*n].refcou < _MAXREFCOUNT {
+		b.nodes[*n].refcou--
 	}
 	return n
 }
@@ -80,14 +80,14 @@ func (b *BDD) DelRef(n int) int {
 // *************************************************************************
 
 // GC starts garbage collection on the nodes.
-func (b *BDD) GC() {
+func (b *buddy) GC() {
 	b.gbc()
 }
 
 // gbc is the garbage collector called for reclaiming memory, inside a call to
 // makenode, when there are no free positions available. Allocated nodes that
 // are not reclaimed do not move.
-func (b *BDD) gbc() {
+func (b *buddy) gbc() {
 	if _LOGLEVEL > 0 {
 		log.Println("starting GC")
 		if _LOGLEVEL > 2 {
@@ -119,13 +119,13 @@ func (b *BDD) gbc() {
 	}
 	// we mark the nodes in the refstack to avoid collecting them
 	for _, r := range b.refstack {
-		b.mark(int(r))
+		b.markrec(int(r))
 	}
 	// we also protect nodes with a positive refcount (and therefore also the
 	// ones with a MAXREFCOUNT, such has variables)
 	for k := range b.nodes {
 		if b.nodes[k].refcou > 0 {
-			b.mark(k)
+			b.markrec(k)
 		}
 		b.nodes[k].hash = 0
 	}
@@ -160,16 +160,13 @@ func (b *BDD) gbc() {
 // *************************************************************************
 // RECURSIVE MARK / UNMARK
 
-func (b *BDD) mark(n int) {
-	if n < 2 {
-		return
-	}
-	if b.ismarked(n) || (b.nodes[n].low == -1) {
+func (b *buddy) markrec(n int) {
+	if n < 2 || b.ismarked(n) || (b.nodes[n].low == -1) {
 		return
 	}
 	b.marknode(n)
-	b.mark(b.nodes[n].low)
-	b.mark(b.nodes[n].high)
+	b.markrec(b.nodes[n].low)
+	b.markrec(b.nodes[n].high)
 }
 
 // func (b *BDD) mark_upto(n int, level int32) {
@@ -188,7 +185,7 @@ func (b *BDD) mark(n int) {
 // }
 
 // markcount returns the number of successors of the node n and mark them.
-func (b *BDD) markcount(n int) int {
+func (b *buddy) markcount(n int) int {
 	if n < 2 {
 		return 0
 	}
@@ -199,17 +196,14 @@ func (b *BDD) markcount(n int) int {
 	return 1 + b.markcount(b.nodes[n].low) + b.markcount(b.nodes[n].high)
 }
 
-// func (b *BDD) unmark(n int) {
-// 	if n < 2 {
-// 		return
-// 	}
-// 	if !b.ismarked(n) || (b.nodes[n].low == -1) {
-// 		return
-// 	}
-// 	b.unmarknode(n)
-// 	b.unmark(b.nodes[n].low)
-// 	b.unmark(b.nodes[n].high)
-// }
+func (b *buddy) unmarkall() {
+	for k, v := range b.nodes {
+		if k < 2 || !b.ismarked(k) || (v.low == -1) {
+			continue
+		}
+		b.unmarknode(k)
+	}
+}
 
 // func (b *BDD) unmark_upto(n int, level int32) {
 // 	if n < 2 {
@@ -231,15 +225,15 @@ func (b *BDD) markcount(n int) int {
 // currently being built (e.g. transient nodes built during an apply) to be
 // reclaimed during GC.
 
-func (b *BDD) initref() {
+func (b *buddy) initref() {
 	b.refstack = b.refstack[:0]
 }
 
-func (b *BDD) pushref(n int) int {
+func (b *buddy) pushref(n int) int {
 	b.refstack = append(b.refstack, n)
 	return n
 }
 
-func (b *BDD) popref(a int) {
+func (b *buddy) popref(a int) {
 	b.refstack = b.refstack[:len(b.refstack)-a]
 }

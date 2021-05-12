@@ -20,16 +20,19 @@ import (
 )
 
 // Error returns the error status of the BDD.
-func (b *BDD) Error() string {
+func (b *buddy) Error() string {
+	if b.error == nil {
+		return ""
+	}
 	return b.error.Error()
 }
 
 // Errored returns true if there was an error during a computation.
-func (b *BDD) Errored() bool {
+func (b *buddy) Errored() bool {
 	return b.error != nil
 }
 
-func (b *BDD) seterror(format string, a ...interface{}) Node {
+func (b *buddy) seterror(format string, a ...interface{}) Node {
 	if b.error != nil {
 		format = format + "; " + b.Error()
 		b.error = fmt.Errorf(format, a...)
@@ -44,8 +47,11 @@ func (b *BDD) seterror(format string, a ...interface{}) Node {
 
 // check performs a sanity check prior to accessing a node and return eventual
 // error code.
-func (b *BDD) checkptr(n Node) error {
+func (b *buddy) checkptr(n Node) error {
 	switch {
+	case n == nil:
+		panic("uncaught error")
+		// return b.error
 	case (*n < 0) || (*n >= len(b.nodes)):
 		b.seterror("Illegal acces to node %d", n)
 		return b.error

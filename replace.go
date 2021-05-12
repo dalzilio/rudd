@@ -47,7 +47,7 @@ func (r *Renamer) String() string {
 // newvars[k]. We return an error if the two slices do not have the same length
 // or if we find the same index twice in either of them. All values must be
 // valid variable levels in the BDD.
-func (b *BDD) NewRenamer(oldvars []int, newvars []int) (*Renamer, error) {
+func (b Set) NewRenamer(oldvars []int, newvars []int) (*Renamer, error) {
 	res := &Renamer{}
 	if len(oldvars) != len(newvars) {
 		return nil, fmt.Errorf("unmatched length of slices")
@@ -57,29 +57,30 @@ func (b *BDD) NewRenamer(oldvars []int, newvars []int) (*Renamer, error) {
 	}
 	res.id = _RENAMERID
 	_RENAMERID++
-	support := make([]bool, b.varnum)
-	res.image = make([]int32, b.varnum)
+	varnum := b.Varnum()
+	support := make([]bool, varnum)
+	res.image = make([]int32, varnum)
 	for k := range res.image {
 		res.image[k] = int32(k)
 	}
 	for k, v := range oldvars {
-		if support[b.level2var[v]] {
+		if support[v] {
 			return nil, fmt.Errorf("duplicate variable (%d) in oldvars", v)
 		}
-		if v >= int(b.varnum) {
+		if v >= varnum {
 			return nil, fmt.Errorf("invalid variable in oldvars (%d)", v)
 		}
-		if newvars[k] >= int(b.varnum) {
+		if newvars[k] >= varnum {
 			return nil, fmt.Errorf("invalid variable in newvars (%d)", v)
 		}
-		support[b.level2var[v]] = true
-		res.image[b.level2var[v]] = int32(b.level2var[newvars[k]])
-		if b.level2var[v] > res.last {
-			res.last = b.level2var[v]
+		support[v] = true
+		res.image[v] = int32(newvars[k])
+		if int32(v) > res.last {
+			res.last = int32(v)
 		}
 	}
 	for _, v := range newvars {
-		if b.level2var[res.image[v]] != b.level2var[v] {
+		if int(res.image[v]) != v {
 			return nil, fmt.Errorf("variable in newvars (%d) also occur in oldvars", v)
 		}
 	}
@@ -90,7 +91,7 @@ func (b *BDD) NewRenamer(oldvars []int, newvars []int) (*Renamer, error) {
 
 // Replace takes a renamer and computes the result of n after replacing old
 // variables with new ones. See type Renamer.
-func (b *BDD) Replace(n Node, r *Renamer) Node {
+func (b *buddy) Replace(n Node, r *Renamer) Node {
 	if b.checkptr(n) != nil {
 		b.seterror("wrong operand in call to Replace (%d)", *n)
 		return bdderror
@@ -100,7 +101,7 @@ func (b *BDD) Replace(n Node, r *Renamer) Node {
 	return b.retnode(b.replace(*n, r))
 }
 
-func (b *BDD) replace(n int, r *Renamer) int {
+func (b *buddy) replace(n int, r *Renamer) int {
 
 	if n < 2 || b.nodes[n].level > r.last {
 		return n
@@ -123,7 +124,7 @@ func (b *BDD) replace(n int, r *Renamer) int {
 	return b.setreplace(n, res)
 }
 
-func (b *BDD) correctify(level int32, low, high int) int {
+func (b *buddy) correctify(level int32, low, high int) int {
 	/* FIXME: we do not use the cache here */
 	if (level < b.nodes[low].level) && (level < b.nodes[high].level) {
 		return b.makenode(level, low, high)

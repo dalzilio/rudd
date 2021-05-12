@@ -24,8 +24,8 @@ import (
 // reachable state of a system composed of N cyclers, with an initial BDD size
 // of size. For this system, we have an anlytical formula to compute the size of
 // the state space.
-func milner_system(size, N int, fast bool) (*BDD, Node, error) {
-	bdd := New(size, 50000)
+func milner_system(size, N int, fast bool) (Set, Node, error) {
+	bdd := Buddy(size, 50000)
 	bdd.SetVarnum(N * 6)
 
 	c := make([]Node, N)
@@ -52,7 +52,7 @@ func milner_system(size, N int, fast bool) (*BDD, Node, error) {
 	}
 	renamer, err := bdd.NewRenamer(pvar, nvar)
 	if err != nil {
-		return nil, nil, err
+		return bdd, nil, err
 	}
 
 	// We create a BDD for the initial state of Milner's cyclers.

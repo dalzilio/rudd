@@ -25,14 +25,14 @@ type bddNode struct {
 
 // ************************************************************
 
-func (b *BDD) ismarked(n int) bool {
+func (b *buddy) ismarked(n int) bool {
 	return (b.nodes[n].level & 0x200000) != 0
 }
 
-func (b *BDD) marknode(n int) {
+func (b *buddy) marknode(n int) {
 	b.nodes[n].level = b.nodes[n].level | 0x200000
 }
 
-func (b *BDD) unmarknode(n int) {
+func (b *buddy) unmarknode(n int) {
 	b.nodes[n].level = b.nodes[n].level & 0x1FFFFF
 }

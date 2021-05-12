@@ -133,7 +133,7 @@ func (bc *cache) cachereset() {
 // *************************************************************************
 // Setup and shutdown
 
-func (b *BDD) cacheinit(cachesize int) {
+func (b *buddy) cacheinit(cachesize int) {
 	b.quantset = make([]int32, 0)
 	if cachesize <= 0 {
 		cachesize = len(b.nodes)/5 + 1
@@ -153,7 +153,7 @@ func (b *BDD) cacheinit(cachesize int) {
 	b.replacecache.cacheinit(cachesize)
 }
 
-func (b *BDD) cachereset() {
+func (b *buddy) cachereset() {
 	b.applycache.cachereset()
 	b.itecache.cachereset()
 	b.quantcache.cachereset()
@@ -162,7 +162,7 @@ func (b *BDD) cachereset() {
 	b.replacecache.cachereset()
 }
 
-func (b *BDD) cacheresize() {
+func (b *buddy) cacheresize() {
 	b.applycache.cacheresize(len(b.nodes))
 	b.itecache.cacheresize(len(b.nodes))
 	b.quantcache.cacheresize(len(b.nodes))
@@ -181,7 +181,7 @@ func (b *BDD) cacheresize() {
 // entries. This value can be set to any positive value. When this is done the
 // caches are resized instantly to fit the new ratio. The default is a fixed
 // cache size determined at initialization time.
-func (b *BDD) SetCacheratio(r int) error {
+func (b *buddy) SetCacheratio(r int) error {
 	if r <= 0 {
 		b.seterror("Negative ratio (%d) in call to SetCacheratio", r)
 		return b.error
@@ -206,7 +206,7 @@ func (b *BDD) SetCacheratio(r int) error {
 
 // quantset2cache takes a variable list, similar to the ones generated with
 // Makeset, and set the variables in the quantification cache.
-func (b *BDD) quantset2cache(n int) error {
+func (b *buddy) quantset2cache(n int) error {
 	if n < 2 {
 		b.seterror("Illegal variable (%d) in varset to cache", n)
 		return b.error

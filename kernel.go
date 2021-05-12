@@ -30,7 +30,7 @@ func inode(n int) Node {
 
 // retnode creates a Node for external use and sets a finalizer on it so that we
 // can reclaim the ressource during GC.
-func (b *BDD) retnode(n int) Node {
+func (b *buddy) retnode(n int) Node {
 	if n < 0 || n > len(b.nodes) {
 		if _DEBUG {
 			log.Print(b.Error())
@@ -85,7 +85,7 @@ const _DEFAULTMAXNODEINC int = 500000
 
 // *************************************************************************
 
-func (b *BDD) makenode(level int32, low, high int) int {
+func (b *buddy) makenode(level int32, low, high int) int {
 	if _DEBUG {
 		b.cacheStat.uniqueAccess++
 	}
@@ -149,7 +149,7 @@ func (b *BDD) makenode(level int32, low, high int) int {
 
 // *************************************************************************
 
-func (b *BDD) noderesize() error {
+func (b *buddy) noderesize() error {
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
 	}
@@ -248,7 +248,7 @@ func (b *BDD) noderesize() error {
 // branch of node n. This is the dual of function Makeset. The result may be nil
 // if there is an error. The result is not necessarily sorted (but follows the
 // level order).
-func (b *BDD) Scanset(n Node) []int {
+func (b *buddy) Scanset(n Node) []int {
 	if b.checkptr(n) != nil {
 		return nil
 	}
@@ -257,7 +257,7 @@ func (b *BDD) Scanset(n Node) []int {
 	}
 	res := []int{}
 	for i := *n; i > 1; i = b.nodes[i].high {
-		res = append(res, int(b.level2var[b.nodes[i].level]))
+		res = append(res, int(b.nodes[i].level))
 	}
 	return res
 }
@@ -267,7 +267,7 @@ func (b *BDD) Scanset(n Node) []int {
 // scanset(Makeset(a)) == a. It returns False and sets the error condition in b
 // if one of the variables is outside the scope of the BDD (see documentation
 // for function *Ithvar*).
-func (b *BDD) Makeset(varset []int) Node {
+func (b *buddy) Makeset(varset []int) Node {
 	res := bddone
 	for _, level := range varset {
 		// FIXME: should find a way to do it without adding references

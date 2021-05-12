@@ -45,11 +45,12 @@ func TestMinus(t *testing.T) {
 //********************************************************************************************
 
 func TestIte_1(t *testing.T) {
-	bdd := New(50, 50)
+	bdd := Buddy(5000, 50)
 	bdd.SetVarnum(4)
 	n1 := bdd.Makeset([]int{0, 2, 3})
 	n2 := bdd.Makeset([]int{0, 3})
 	actual := bdd.Equiv(bdd.Ite(n1, n2, bdd.Not(n2)), bdd.Or(bdd.And(n1, n2), bdd.And(bdd.Not(n1), bdd.Not(n2))))
+	bdd.PrintDot("aa")
 	if actual != bdd.True() {
 		t.Errorf("ite(f,g,h) <=> (f or g) and (-f or h): expected true, actual false")
 	}
@@ -62,8 +63,9 @@ func TestIte_1(t *testing.T) {
 // are detected.
 
 func TestOperations(t *testing.T) {
-	bdd := New(1000, 1000)
+	bdd := Buddy(1000, 1000)
 	bdd.SetVarnum(4)
+	varnum := 4
 
 	test1_check := func(x Node) error {
 		allsatBDD := x
@@ -85,7 +87,7 @@ func TestOperations(t *testing.T) {
 			allsatSumBDD = bdd.Or(allsatSumBDD, x)
 			// Remove assignment from initial set
 			allsatBDD = bdd.Apply(allsatBDD, x, OPdiff)
-			return bdd.error
+			return nil
 		})
 
 		// Now the summed set should be equal to the original set and the
@@ -122,14 +124,14 @@ func TestOperations(t *testing.T) {
 	// a & !b | a & !d | a & b & !c
 	test1_check(bdd.Or(bdd.And(a, nb), bdd.And(a, nd), bdd.And(a, b, nc)))
 
-	for i := 0; i < int(bdd.varnum); i++ {
+	for i := 0; i < varnum; i++ {
 		test1_check(bdd.Ithvar(i))
 		test1_check(bdd.NIthvar(i))
 	}
 
 	set := bdd.True()
 	for i := 0; i < 50; i++ {
-		v := rand.Intn(int(bdd.varnum))
+		v := rand.Intn(varnum)
 		s := rand.Intn(2)
 		o := rand.Intn(2)
 

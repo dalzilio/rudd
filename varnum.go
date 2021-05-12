@@ -19,7 +19,7 @@ import "log"
 // SetVarnum sets the number of BDD variables. This function is used to define
 // the number of variables used in the BDD package. It may be called more than
 // one time, but only to increase the number of variables.
-func (b *BDD) SetVarnum(num int) error {
+func (b *buddy) SetVarnum(num int) error {
 	oldvarnum := b.varnum
 	inum := int32(num)
 	if (inum < 1) || (inum > _MAXVAR) {
@@ -40,19 +40,9 @@ func (b *BDD) SetVarnum(num int) error {
 	b.varset = make([][2]int, inum)
 	copy(b.varset, tmpvarset)
 
-	tmplevel2var := b.level2var
-	b.level2var = make([]int32, inum+1)
-	copy(b.level2var, tmplevel2var)
-
-	tmpvar2level := b.var2level
-	b.var2level = make([]int32, inum+1)
-	copy(b.var2level, tmpvar2level)
-
 	// Constants always have the highest level.
 	b.nodes[0].level = inum
 	b.nodes[1].level = inum
-	b.var2level[inum] = inum
-	b.level2var[inum] = inum
 
 	// We also initialize the refstack.
 	b.refstack = make([]int, 0, 2*inum+4)
@@ -76,8 +66,6 @@ func (b *BDD) SetVarnum(num int) error {
 		b.varset[b.varnum] = [2]int{v0, v1}
 		b.nodes[b.varset[b.varnum][0]].refcou = _MAXREFCOUNT
 		b.nodes[b.varset[b.varnum][1]].refcou = _MAXREFCOUNT
-		b.level2var[b.varnum] = b.varnum
-		b.var2level[b.varnum] = b.varnum
 	}
 
 	// We also need to resize the quantification cache
@@ -94,7 +82,7 @@ func (b *BDD) SetVarnum(num int) error {
 
 // ExtVarnum extends the current number of allocated BDD variables with num
 // extra variables
-func (b *BDD) ExtVarnum(num int) error {
+func (b *buddy) ExtVarnum(num int) error {
 	if (num < 0) || (num > 0x3FFFFFFF) {
 		b.seterror("Bad choice of value (%d) when extending varnum in ExtVarnum", num)
 		return b.error

@@ -76,7 +76,7 @@ var opres = [12][2][2]int{
 // Not returns the negation of the expression corresponding to node n. It
 // negates a BDD by exchanging all references to the zero-terminal with
 // references to the one-terminal and vice versa.
-func (b *BDD) Not(n Node) Node {
+func (b *buddy) Not(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong operand in call to Not (%d)", *n)
 	}
@@ -87,7 +87,7 @@ func (b *BDD) Not(n Node) Node {
 	return b.retnode(res)
 }
 
-func (b *BDD) not(n int) int {
+func (b *buddy) not(n int) int {
 	if n == 0 {
 		return 1
 	}
@@ -129,7 +129,7 @@ func (b *BDD) not(n int) int {
 // 	OPdiff		  set difference 		 [0,0,1,0]
 // 	OPless   	  less than				 [0,1,0,0]
 //  OPinvimp	  reverse implication 	 [1,0,1,1]
-func (b *BDD) Apply(left Node, right Node, op Operator) Node {
+func (b *buddy) Apply(left Node, right Node, op Operator) Node {
 	if b.checkptr(left) != nil {
 		return b.seterror("Wrong operand in call to Apply %s(left: %d, right: ...)", op, *left)
 	}
@@ -145,7 +145,7 @@ func (b *BDD) Apply(left Node, right Node, op Operator) Node {
 	return b.retnode(res)
 }
 
-func (b *BDD) apply(left int, right int) int {
+func (b *buddy) apply(left int, right int) int {
 	switch b.applycache.op {
 	case OPand:
 		if left == right {
@@ -301,7 +301,7 @@ func (b *BDD) apply(left int, right int) int {
 // Ite, short for if-then-else operator, computes the BDD for the expression [(f
 // /\ g) \/ (not f /\ h)] more efficiently than doing the three operations
 // separately.
-func (b *BDD) Ite(f, g, h Node) Node {
+func (b *buddy) Ite(f, g, h Node) Node {
 	if b.checkptr(f) != nil {
 		return b.seterror("Wrong operand in call to Ite (f: %d)", *f)
 	}
@@ -323,14 +323,14 @@ func (b *BDD) Ite(f, g, h Node) Node {
 // ite_low returns p if p is strictly higher than q or r, otherwise it returns
 // p.low. This is used in function ite to know which node to follow: we always
 // follow the smallest(s) nodes.
-func (b *BDD) ite_low(p, q, r int32, n int) int {
+func (b *buddy) ite_low(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
 	return b.nodes[n].low
 }
 
-func (b *BDD) ite_high(p, q, r int32, n int) int {
+func (b *buddy) ite_high(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
@@ -352,7 +352,7 @@ func min3(p, q, r int32) int32 {
 	return r // r < q < p
 }
 
-func (b *BDD) ite(f, g, h int) int {
+func (b *buddy) ite(f, g, h int) int {
 	switch {
 	case f == 1:
 		return g
@@ -394,54 +394,10 @@ func (b *BDD) ite(f, g, h int) int {
 
 // *************************************************************************
 
-// And returns the logical 'and' of a sequence of nodes.
-func (b *BDD) And(n ...Node) Node {
-	if len(n) == 1 {
-		return n[0]
-	}
-	if len(n) == 0 {
-		return bddone
-	}
-	return b.Apply(n[0], b.And(n[1:]...), OPand)
-}
-
-// Or returns the logical 'or' of a sequence of BDDs.
-func (b *BDD) Or(n ...Node) Node {
-	if len(n) == 1 {
-		return n[0]
-	}
-	if len(n) == 0 {
-		return bddzero
-	}
-	return b.Apply(n[0], b.Or(n[1:]...), OPor)
-}
-
-// Xor returns the logical 'xor' of two BDDs.
-func (b *BDD) Xor(low, high Node) Node {
-	return b.Apply(low, high, OPxor)
-}
-
-// Imp returns the logical 'implication' between two BDDs.
-func (b *BDD) Imp(low, high Node) Node {
-	return b.Apply(low, high, OPimp)
-}
-
-// Equiv returns the logical 'bi-implication' between two BDDs.
-func (b *BDD) Equiv(low, high Node) Node {
-	return b.Apply(low, high, OPbiimp)
-}
-
-// Equal tests equivalence between nodes.
-func (b *BDD) Equal(low, high Node) bool {
-	return *low == *high
-}
-
-// *************************************************************************
-
 // Exist returns the existential quantification of n for the variables in
 // varset, where varset is a node built with a method such as Makeset. We return
 // bdderror and set the error flag in b if there is an error.
-func (b *BDD) Exist(n, varset Node) Node {
+func (b *buddy) Exist(n, varset Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong node in call to Exist (n: %d)", *n)
 	}
@@ -465,7 +421,7 @@ func (b *BDD) Exist(n, varset Node) Node {
 	return b.retnode(res)
 }
 
-func (b *BDD) quant(n int) int {
+func (b *buddy) quant(n int) int {
 	if (n < 2) || (b.nodes[n].level > b.quantlast) {
 		return n
 	}
@@ -500,7 +456,7 @@ func (b *BDD) quant(n int) int {
 // nodes. This makes AppEx much more efficient than an apply operation followed
 // by a quantification. Note that, when *op* is a conjunction, this operation
 // returns the relational product of two BDDs.
-func (b *BDD) AppEx(left Node, right Node, op Operator, varset Node) Node {
+func (b *buddy) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	// FIXME: should check that op is a binary operation
 	if b.checkptr(varset) != nil {
 		return b.seterror("Wrong varset in call to AppEx (%d)", *varset)
@@ -531,7 +487,7 @@ func (b *BDD) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	return b.retnode(res)
 }
 
-func (b *BDD) appquant(left, right int) int {
+func (b *buddy) appquant(left, right int) int {
 	switch b.appexcache.op {
 	case OPand:
 		if left == 0 || right == 0 {
@@ -655,7 +611,7 @@ func (b *BDD) appquant(left, right int) int {
 // function denoted by n. We return a result using arbitrary-precision
 // arithmetic to avoid possible overflows. The result is zero (and we set the
 // error flag of b) if there is an error.
-func (b *BDD) Satcount(n Node) *big.Int {
+func (b *buddy) Satcount(n Node) *big.Int {
 	res := big.NewInt(0)
 	if b.checkptr(n) != nil {
 		b.seterror("Wrong operand in call to Satcount (%d)", *n)
@@ -667,7 +623,7 @@ func (b *BDD) Satcount(n Node) *big.Int {
 	return res.Mul(res, b.satcount(*n, satc))
 }
 
-func (b *BDD) satcount(n int, satc map[int]*big.Int) *big.Int {
+func (b *buddy) satcount(n int, satc map[int]*big.Int) *big.Int {
 	if n < 2 {
 		return big.NewInt(int64(n))
 	}
@@ -695,18 +651,18 @@ func (b *BDD) satcount(n int, satc map[int]*big.Int) *big.Int {
 
 // Allsat Iterates through all legal variable assignments for n and calls the
 // function f on each of them. We pass an int slice of length varnum to f where
-// ach entry is either  0 if the variable is false, 1 if it is true, and -1 if
+// each entry is either  0 if the variable is false, 1 if it is true, and -1 if
 // it is a don't care. We stop and return an error if f returns an error at some
 // point.
 //
 // The following is an example of a callback handler that counts the number of
 // possible assignments (such that we do not count don't care twice):
-// 	   acc := new(int)
-//     b.allsat(*n, prof, func(varset []int) error {
-// 	     *acc++
-// 	      return nil
+//     acc := new(int)
+//     b.Allsat(n, func(varset []int) error {
+//       *acc++
+//        return nil
 //      })
-func (b *BDD) Allsat(n Node, f func([]int) error) error {
+func (b *buddy) Allsat(n Node, f func([]int) error) error {
 	if b.checkptr(n) != nil {
 		return fmt.Errorf("wrong node in call to Allsat (%d)", *n)
 	}
@@ -719,7 +675,7 @@ func (b *BDD) Allsat(n Node, f func([]int) error) error {
 	return b.allsat(*n, prof, f)
 }
 
-func (b *BDD) allsat(n int, prof []int, f func([]int) error) error {
+func (b *buddy) allsat(n int, prof []int, f func([]int) error) error {
 	if n == 1 {
 		return f(prof)
 	}
@@ -728,9 +684,9 @@ func (b *BDD) allsat(n int, prof []int, f func([]int) error) error {
 	}
 
 	if low := b.nodes[n].low; low != 0 {
-		prof[b.level2var[b.nodes[n].level]] = 0
+		prof[b.nodes[n].level] = 0
 		for v := b.nodes[low].level - 1; v > b.nodes[n].level; v-- {
-			prof[b.level2var[v]] = -1
+			prof[v] = -1
 		}
 		if err := b.allsat(low, prof, f); err != nil {
 			return nil
@@ -738,12 +694,87 @@ func (b *BDD) allsat(n int, prof []int, f func([]int) error) error {
 	}
 
 	if high := b.nodes[n].high; high != 0 {
-		prof[b.level2var[b.nodes[n].level]] = 1
+		prof[b.nodes[n].level] = 1
 		for v := b.nodes[high].level - 1; v > b.nodes[n].level; v-- {
-			prof[b.level2var[v]] = -1
+			prof[v] = -1
 		}
 		if err := b.allsat(high, prof, f); err != nil {
 			return nil
+		}
+	}
+	return nil
+}
+
+// *************************************************************************
+
+// Allnodes applies function f over all the nodes accessible from the nodes in
+// the sequence n..., or all the active nodes if n is absent. The parameters to
+// function f are the id, level, and id's of the low and high successors of each
+// node. The two constant nodes (True and False) have always the id 1 and 0,
+// respectively.
+//
+// The order in which nodes are visited is not specified. The behavior is very
+// similar to the one of Allsat. In particular, we stop the computation and
+// return an error if f returns an error at some point.
+//
+// The following is an example of a callback handler that counts the number of
+// active nodes in the BDD:
+//     acc := new(int)
+//     b.List(func(varset []int, n1, n2) error {
+//       *acc++
+//        return nil
+//      })
+func (b *buddy) Allnodes(f func(id, level, low, high int) error, n ...Node) error {
+	for _, v := range n {
+		if b.checkptr(v) != nil {
+			return fmt.Errorf("wrong node in call to Allnodes (%d)", *v)
+		}
+	}
+	// the function does not create new nodes, so we do not need to take care of
+	// possible resizing.
+	if len(n) == 0 {
+		// we call f over all active nodes
+		return b.allnodes(f)
+	}
+	return b.allnodesfrom(f, n)
+}
+
+func (b *buddy) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
+	for _, v := range n {
+		b.markrec(*v)
+	}
+	if err := f(0, b.Varnum(), 0, 0); err != nil {
+		b.unmarkall()
+		return err
+	}
+	if err := f(1, b.Varnum(), 1, 1); err != nil {
+		b.unmarkall()
+		return err
+	}
+	for k := range b.nodes {
+		if k > 1 && b.ismarked(k) {
+			b.unmarknode(k)
+			if err := f(k, int(b.nodes[k].level), b.nodes[k].low, b.nodes[k].high); err != nil {
+				b.unmarkall()
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (b *buddy) allnodes(f func(id, level, low, high int) error) error {
+	if err := f(0, b.Varnum(), 0, 0); err != nil {
+		return err
+	}
+	if err := f(1, b.Varnum(), 1, 1); err != nil {
+		return err
+	}
+	for k, v := range b.nodes {
+		if v.low != -1 {
+			if err := f(k, int(v.level), v.low, v.high); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

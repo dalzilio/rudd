@@ -14,197 +14,188 @@
 
 package rudd
 
-import (
-	"log"
-	"sync/atomic"
-)
+import "math/big"
 
-// BDD implements a Binary Decision Diagram.
-type BDD struct {
-	nodes           []bddNode   // List of all the BDD nodes. Constants are always kept at index 0 and 1
-	freenum         int         // Number of free nodes
-	freepos         int         // First free node
-	varnum          int32       // number of BDD variables
-	varset          [][2]int    // Set of variables used: we have a pair for the var. and its negation
-	var2level       []int32     // Variable -> level table
-	level2var       []int32     // Level -> variable table
-	refstack        []int       // Internal node reference stack
-	error                       // Error status to help chain operations
-	nodefinalizer   interface{} // Finalizer used to decrement the ref count of external references
-	maxnodesize     int         // Maximum total number of nodes (0 if no limit)
-	maxnodeincrease int         // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
-	minfreenodes    int         // Minimum number of nodes that should be left after GC before triggering a resize
-	quantset        []int32     // Current variable set for quant.
-	quantsetID      int32       // Current id used in quantset
-	quantlast       int32       // Current last variable to be quant.
-	bddStats                    // Information about the BDD
-	gchistory       []gcStat    // Information about garbage collections
-	cacheStat                   // Information about the caches
-	*applycache                 // Cache for apply results
-	*itecache                   // Cache for ITE results
-	*quantcache                 // Cache for exist/forall results
-	*appexcache                 // Cache for AppEx results
-	*replacecache               // Cache for Replace results
-	// *misccache                  // Cache for other operations, such as satcount
+// Set encapsulates the access to a BDD implementation and provides additionnal
+// functions to ease the display and computation of arbitrary Boolean
+// expressions.
+type Set struct {
+	// we embedd the BDD interface in order to implement methods with a Set
+	// receiver
+	BDD
+}
+
+// BDD is an interface implementing the basic operations over Binary Decision
+// Diagrams.
+type BDD interface {
+	// Error returns the error status of the BDD. We return an empty string if
+	// there are no errors.
+	Error() string
+
+	// SetVarnum sets the number of BDD variables. It may be called more than
+	// once, but only to increase the number of variables.
+	SetVarnum(num int) error
+
+	// Varnum returns the number of defined variables.
+	Varnum() int
+
+	// True returns the Node for the constant true.
+	True() Node
+
+	// False returns the Node for the constant false.
+	False() Node
+
+	// From returns a (constant) Node from a boolean value.
+	From(v bool) Node
+
+	// Ithvar returns a BDD representing the i'th variable on success. The
+	// requested variable must be in the range [0..Varnum).
+	Ithvar(i int) Node
+
+	// NIthvar returns a bdd representing the negation of the i'th variable on
+	// success. See *ithvar* for further info.
+	NIthvar(i int) Node
+
+	// Low returns the false branch of a BDD or nil if there is an error.
+	Low(n Node) Node
+
+	// High returns the true branch of a BDD.
+	High(n Node) Node
+
+	// Makeset returns a node corresponding to the conjunction (the cube) of all
+	// the variables in varset, in their positive form. It is such that
+	// scanset(Makeset(a)) == a. It returns nil if one of the variables is
+	// outside the scope of the BDD (see documentation for function *Ithvar*).
+	Makeset(varset []int) Node
+
+	// Scanset returns the set of variables found when following the high branch
+	// of node n. This is the dual of function Makeset. The result may be nil if
+	// there is an error and it is an empty slice if the set is empty.
+	Scanset(n Node) []int
+
+	// Not returns the negation (!n) of expression n.
+	Not(n Node) Node
+
+	// Apply performs all of the basic binary operations on BDD nodes, such as
+	// AND, OR etc.
+	Apply(left Node, right Node, op Operator) Node
+
+	// Ite, short for if-then-else operator, computes the BDD for the expression
+	// [(f &  g) | (!f & h)] more efficiently than doing the three operations
+	// separately.
+	Ite(f, g, h Node) Node
+
+	// Exist returns the existential quantification of n for the variables in
+	// varset, where varset is a node built with a method such as Makeset.
+	Exist(n, varset Node) Node
+
+	// AppEx applies the binary operator *op* on the two operands left and right
+	// then performs an existential quantification over the variables in varset,
+	// where varset is a node computed with an operation such as Makeset.
+	AppEx(left Node, right Node, op Operator, varset Node) Node
+
+	// Replace takes a renamer and computes the result of n after replacing old
+	// variables with new ones. See type Renamer.
+	Replace(n Node, r *Renamer) Node
+
+	// Satcount computes the number of satisfying variable assignments for the
+	// function denoted by n. We return a result using arbitrary-precision
+	// arithmetic to avoid possible overflows. The result is zero (and we set
+	// the error flag of b) if there is an error.
+	Satcount(n Node) *big.Int
+
+	// Allsat Iterates through all legal variable assignments for n and calls
+	// the function f on each of them. We pass an int slice of length varnum to
+	// f where each entry is either 0 if the variable is false, 1 if it is true,
+	// and -1 if it is a don't care. We stop and return an error if f returns an
+	// error at some point.
+	Allsat(n Node, f func([]int) error) error
+
+	// Allnodes is similar to Allsat but iterates over all the nodes accessible from n in the BDD,
+	// or all the active nodes if n is nil. The parameters to function f are the id,
+	// level, and id's of the low and high successors of each node. The two constant
+	// nodes (True and False) have always the id 1 and 0 respectively.
+	Allnodes(f func(id, level, low, high int) error, n ...Node) error
+
+	// // AddRef increases the reference count on node n and returns n so that
+	// // calls can be easily chained together. A call to AddRef can never raise an
+	// // error, even if we access an unused node or a value outside the range of
+	// // the BDD.
+	// AddRef(n Node) Node
+
+	// // DelRef decreases the reference count on a node and returns n so that
+	// // calls can be easily chained together. A call to DelRef can never raise an
+	// // error, even if we access an unused node or a value outside the range of
+	// // the BDD.
+	// DelRef(n Node) Node
+
+	// // GC explitly starts garbage collection of unused nodes.
+	// GC()
+
+	// Stats returns information about the BDD
+	Stats() string
 }
 
 // ************************************************************
 
-// Node is a reference to an element of a BDD. It is the atomic level of
-// interaction and computation with a BDD.
+// Node is a reference to an element of a BDD. It represents the atomic unit of
+// interactions and computations within a BDD.
 type Node *int
 
 // ************************************************************
 
-// bddStats stores status information about a BDD.
-type bddStats struct {
-	produced         int    // Total number of new nodes ever produced
-	setfinalizers    uint64 // Total number of external references to BDD nodes since the last GC
-	calledfinalizers uint64 // Number of external references that were freed since the last GC
-}
-
-// ************************************************************
-
-// New initializes a new BDD. Parameter *nodesize* is the initial number of
-// nodes in the nodetable and *cachesize* is the fixed size of the internal
-// caches. Typical values for *nodesize* are 10 000 nodes for small test
-// examples and up to 1 000 000 nodes for large examples. A cache size of 10 000
-// seems to work good even for large examples, but lesser values should do it
-// for smaller examples.
-//
-// The number of cache entries can also be set to depend on the size of the
-// nodetable using a call to *SetCacheRatio*.
-//
-// The initial number of nodes is not critical for any NDD operation as the
-// table will be resized whenever there are too few nodes left after a garbage
-// collection. But it does have some impact on the efficency of the operations.
-// It returns nil if no errors occur.
-func New(nodesize int, cachesize int) *BDD {
-	b := &BDD{}
-	nodesize = bdd_prime_gte(nodesize)
-	b.minfreenodes = _MINFREENODES
-	b.maxnodeincrease = _DEFAULTMAXNODEINC
-	// initializing the list of nodes
-	b.nodes = make([]bddNode, nodesize)
-	for k := range b.nodes {
-		b.nodes[k] = bddNode{
-			refcou: 0,
-			level:  0,
-			low:    -1,
-			high:   0,
-			hash:   0,
-			next:   k + 1,
-		}
+// And returns the logical 'and' of a sequence of nodes.
+func (b Set) And(n ...Node) Node {
+	if len(n) == 1 {
+		return n[0]
 	}
-	b.nodes[nodesize-1].next = 0
-	b.nodes[0].refcou = _MAXREFCOUNT
-	b.nodes[1].refcou = _MAXREFCOUNT
-	b.nodes[0].low = 0
-	b.nodes[0].high = 0
-	b.nodes[1].low = 1
-	b.nodes[1].high = 1
-	// setting the last fields of b
-	b.cacheinit(cachesize)
-	b.freepos = 2
-	b.freenum = nodesize - 2
-	b.varnum = 0
-	b.gchistory = make([]gcStat, 0)
-	b.maxnodeincrease = _DEFAULTMAXNODEINC
-	b.error = nil
-	b.nodefinalizer = func(n *int) {
-		if _DEBUG {
-			atomic.AddUint64(&(b.calledfinalizers), 1)
-			if _LOGLEVEL > 2 {
-				log.Printf("dec refcou %d\n", *n)
-			}
-		}
-		b.nodes[*n].refcou--
-	}
-	return b
-}
-
-// ************************************************************
-
-// True returns the constant true BDD
-func (b *BDD) True() Node {
-	return bddone
-}
-
-// False returns the constant false BDD
-func (b *BDD) False() Node {
-	return bddzero
-}
-
-// From returns a (constant) Node from a boolean value.
-func (b *BDD) From(v bool) Node {
-	if v {
+	if len(n) == 0 {
 		return bddone
 	}
-	return bddzero
+	return b.Apply(n[0], b.And(n[1:]...), OPand)
 }
 
-// ErrorValue returns the constant used to check for errors
-func (b *BDD) ErrorValue() Node {
-	return bdderror
-}
-
-// ************************************************************
-
-// Ithvar returns a BDD representing the i'th variable on success, otherwise we
-// set the error status in the BDD and returns the constant False. The requested
-// variable must be in the range [0..Varnum).
-func (b *BDD) Ithvar(i int) Node {
-	if (i < 0) || (int32(i) >= b.varnum) {
-		b.seterror("Unknown variable used (%d) in call to ithvar", i)
+// Or returns the logical 'or' of a sequence of BDDs.
+func (b Set) Or(n ...Node) Node {
+	if len(n) == 1 {
+		return n[0]
+	}
+	if len(n) == 0 {
 		return bddzero
 	}
-	// we do not need to reference count variables
-	return inode(b.varset[i][0])
+	return b.Apply(n[0], b.Or(n[1:]...), OPor)
 }
 
-// NIthvar returns a bdd representing the negation of the i'th variable on
-// success, otherwise the constant false bdd. See *ithvar* for further info.
-func (b *BDD) NIthvar(i int) Node {
-	if (i < 0) || (int32(i) >= b.varnum) {
-		return b.seterror("Unknown variable used (%d) in call to nithvar", i)
-	}
-	// we do not need to reference count variables
-	return inode(b.varset[i][1])
+// Xor returns the logical 'xor' of two BDDs.
+func (b Set) Xor(low, high Node) Node {
+	return b.Apply(low, high, OPxor)
 }
 
-// Varnum returns the number of defined variables.
-func (b *BDD) Varnum() int32 {
-	return b.varnum
+// Imp returns the logical 'implication' between two BDDs.
+func (b Set) Imp(low, high Node) Node {
+	return b.Apply(low, high, OPimp)
 }
 
-// Label returns the variable (index) corresponding to node n in the BDD. We set
-// the BDD to its error state and return -1 if we try to access a constant node.
-func (b *BDD) Label(n Node) int32 {
-	if b.checkptr(n) != nil {
-		b.seterror("Illegal access to node %d in call to Label", n)
-		return -1
-	}
-	if *n < 2 {
-		b.seterror("Try to access label of constant node")
-		return -1
-	}
-	return b.level2var[b.nodes[*n].level]
+// Equiv returns the logical 'bi-implication' between two BDDs.
+func (b Set) Equiv(low, high Node) Node {
+	return b.Apply(low, high, OPbiimp)
 }
 
-// Low returns the false branch of a BDD. We return bdderror if there is an
-// error and set the error flag in the BDD.
-func (b *BDD) Low(n Node) Node {
-	if b.checkptr(n) != nil {
-		return b.seterror("Illegal access to node %d in call to Low", n)
+// Equal tests equivalence between nodes.
+func (b Set) Equal(low, high Node) bool {
+	if low == high {
+		return true
 	}
-	return b.retnode(b.nodes[*n].low)
+	if low == nil || high == nil {
+		return false
+	}
+	return *low == *high
 }
 
-// High returns the true branch of a BDD. We return bdderror if there is an
-// error and set the error flag in the BDD.
-func (b *BDD) High(n Node) Node {
-	if b.checkptr(n) != nil {
-		return b.seterror("Illegal access to node %d in call to High", n)
-	}
-	return b.retnode(b.nodes[*n].high)
+// AndExists returns the "relational composition" of two nodes with respect to
+// varset, meaning the result of (Exists varset . n1 & n2).
+func (b Set) AndExist(varset, n1, n2 Node) Node {
+	return b.AppEx(n1, n2, OPand, varset)
 }
+
+// *************************************************************************
