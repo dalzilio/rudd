@@ -12,6 +12,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+// +build debug
+
 package rudd
 
 import (
@@ -19,9 +21,8 @@ import (
 	"os"
 )
 
-// we can later use buid tags to change the behavior of cache statistics: +build debug
-const _DEBUG bool = false // true
-const _LOGLEVEL int = 0   // 1
+const _DEBUG bool = true
+const _LOGLEVEL int = 1
 
 // ******************************************************************************************************
 
@@ -31,7 +32,7 @@ func init() {
 
 // ******************************************************************************************************
 
-func (b *BDD) logTable() {
+func (b *buddy) logTable() {
 	if b.error != nil {
 		log.Printf("ERROR: %s\n", b.error)
 	}
