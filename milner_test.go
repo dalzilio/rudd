@@ -50,7 +50,7 @@ func milner_system(size, N int, fast bool) (Set, Node, error) {
 		nvar[n] = n * 2   // normal variables
 		pvar[n] = n*2 + 1 // primed variables
 	}
-	renamer, err := bdd.NewRenamer(pvar, nvar)
+	replacer, err := bdd.NewReplacer(pvar, nvar)
 	if err != nil {
 		return bdd, nil, err
 	}
@@ -92,9 +92,9 @@ func milner_system(size, N int, fast bool) (Set, Node, error) {
 		count++
 		prev := R
 		if fast {
-			R = bdd.Or(bdd.Replace(bdd.AppEx(R, T, OPand, normvar), renamer), R)
+			R = bdd.Or(bdd.Replace(bdd.AndExist(normvar, R, T), replacer), R)
 		} else {
-			R = bdd.Or(bdd.Replace(bdd.Exist(bdd.And(R, T), normvar), renamer), R)
+			R = bdd.Or(bdd.Replace(bdd.Exist(bdd.And(R, T), normvar), replacer), R)
 		}
 		if *prev == *R {
 			break

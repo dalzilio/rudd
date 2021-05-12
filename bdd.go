@@ -96,7 +96,7 @@ type BDD interface {
 
 	// Replace takes a renamer and computes the result of n after replacing old
 	// variables with new ones. See type Renamer.
-	Replace(n Node, r *Renamer) Node
+	Replace(n Node, r Replacer) Node
 
 	// Satcount computes the number of satisfying variable assignments for the
 	// function denoted by n. We return a result using arbitrary-precision
@@ -111,10 +111,11 @@ type BDD interface {
 	// error at some point.
 	Allsat(n Node, f func([]int) error) error
 
-	// Allnodes is similar to Allsat but iterates over all the nodes accessible from n in the BDD,
-	// or all the active nodes if n is nil. The parameters to function f are the id,
-	// level, and id's of the low and high successors of each node. The two constant
-	// nodes (True and False) have always the id 1 and 0 respectively.
+	// Allnodes is similar to Allsat but iterates over all the nodes accessible
+	// from one of the parameters in n (or all the active nodes if n is absent).
+	// Function f takes the id, level, and id's of the low and high successors
+	// of each node. The two constant nodes (True and False) have always the id
+	// 1 and 0 respectively.
 	Allnodes(f func(id, level, low, high int) error, n ...Node) error
 
 	// // AddRef increases the reference count on node n and returns n so that
@@ -166,19 +167,14 @@ func (b Set) Or(n ...Node) Node {
 	return b.Apply(n[0], b.Or(n[1:]...), OPor)
 }
 
-// Xor returns the logical 'xor' of two BDDs.
-func (b Set) Xor(low, high Node) Node {
-	return b.Apply(low, high, OPxor)
-}
-
 // Imp returns the logical 'implication' between two BDDs.
-func (b Set) Imp(low, high Node) Node {
-	return b.Apply(low, high, OPimp)
+func (b Set) Imp(n1, n2 Node) Node {
+	return b.Apply(n1, n2, OPimp)
 }
 
 // Equiv returns the logical 'bi-implication' between two BDDs.
-func (b Set) Equiv(low, high Node) Node {
-	return b.Apply(low, high, OPbiimp)
+func (b Set) Equiv(n1, n2 Node) Node {
+	return b.Apply(n1, n2, OPbiimp)
 }
 
 // Equal tests equivalence between nodes.

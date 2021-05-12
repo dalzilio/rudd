@@ -19,17 +19,23 @@ import (
 	"math"
 )
 
-var _RENAMERID = 0
+var _REPLACEID = 1
 
-// Renamer is an object used to replace variables in a BDD node.
-type Renamer struct {
-	id    int     // unique identifier used for caching intermediate results
-	image []int32 // map the level of old variables to the level of new variables
-	last  int32   // last index in the renamer, to speed up computations
+// Replacer is the type of association lists used to replace variables in a BDD
+// node.
+type Replacer interface {
+	Replace(int32) (int32, bool)
+	Id() int
 }
 
-func (r *Renamer) String() string {
-	res := fmt.Sprintf("renamer(last: %d)[", r.last)
+type replacer struct {
+	id    int     // unique identifier used for caching intermediate results
+	image []int32 // map the level of old variables to the level of new variables
+	last  int32   // last index in the Replacer, to speed up computations
+}
+
+func (r *replacer) String() string {
+	res := fmt.Sprintf("replacer(last: %d)[", r.last)
 	first := true
 	for k, v := range r.image {
 		if k != int(v) {
@@ -43,20 +49,31 @@ func (r *Renamer) String() string {
 	return res + "]"
 }
 
-// NewRenamer returns a renamer for substituting variable oldvars[k] with
+func (r *replacer) Replace(level int32) (int32, bool) {
+	if level > r.last {
+		return level, false
+	}
+	return r.image[level], true
+}
+
+func (r *replacer) Id() int {
+	return r.id
+}
+
+// NewReplacer returns a Replacer for substituting variable oldvars[k] with
 // newvars[k]. We return an error if the two slices do not have the same length
-// or if we find the same index twice in either of them. All values must be
-// valid variable levels in the BDD.
-func (b Set) NewRenamer(oldvars []int, newvars []int) (*Renamer, error) {
-	res := &Renamer{}
+// or if we find the same index twice in either of them. All values must be in
+// [0..Varnum).
+func (b Set) NewReplacer(oldvars []int, newvars []int) (Replacer, error) {
+	res := &replacer{}
 	if len(oldvars) != len(newvars) {
 		return nil, fmt.Errorf("unmatched length of slices")
 	}
-	if _RENAMERID == (math.MaxInt32 >> 2) {
-		return nil, fmt.Errorf("too many renamers created")
+	if _REPLACEID == (math.MaxInt32 >> 2) {
+		return nil, fmt.Errorf("too many replacers created")
 	}
-	res.id = _RENAMERID
-	_RENAMERID++
+	res.id = (_REPLACEID << 2) | cacheid_REPLACE
+	_REPLACEID++
 	varnum := b.Varnum()
 	support := make([]bool, varnum)
 	res.image = make([]int32, varnum)
@@ -89,24 +106,22 @@ func (b Set) NewRenamer(oldvars []int, newvars []int) (*Renamer, error) {
 
 // ************************************************************
 
-// Replace takes a renamer and computes the result of n after replacing old
-// variables with new ones. See type Renamer.
-func (b *buddy) Replace(n Node, r *Renamer) Node {
+// Replace takes a Replacer and computes the result of n after replacing old
+// variables with new ones. See type Replacer.
+func (b *buddy) Replace(n Node, r Replacer) Node {
 	if b.checkptr(n) != nil {
-		b.seterror("wrong operand in call to Replace (%d)", *n)
-		return bdderror
+		return b.seterror("wrong operand in call to Replace (%d)", *n)
 	}
 	b.initref()
-	b.replacecache.id = r.id<<2 | cacheid_REPLACE
+	b.replacecache.id = r.Id()
 	return b.retnode(b.replace(*n, r))
 }
 
-func (b *buddy) replace(n int, r *Renamer) int {
-
-	if n < 2 || b.nodes[n].level > r.last {
+func (b *buddy) replace(n int, r Replacer) int {
+	image, ok := r.Replace(b.nodes[n].level)
+	if !ok {
 		return n
 	}
-
 	if res := b.matchreplace(n); res >= 0 {
 		if _DEBUG {
 			b.cacheStat.opHit++
@@ -116,10 +131,9 @@ func (b *buddy) replace(n int, r *Renamer) int {
 	if _DEBUG {
 		b.cacheStat.opMiss++
 	}
-
 	low := b.pushref(b.replace(b.nodes[n].low, r))
 	high := b.pushref(b.replace(b.nodes[n].high, r))
-	res := b.correctify(r.image[b.nodes[n].level], low, high)
+	res := b.correctify(image, low, high)
 	b.popref(2)
 	return b.setreplace(n, res)
 }

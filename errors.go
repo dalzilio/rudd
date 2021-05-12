@@ -36,13 +36,13 @@ func (b *buddy) seterror(format string, a ...interface{}) Node {
 	if b.error != nil {
 		format = format + "; " + b.Error()
 		b.error = fmt.Errorf(format, a...)
-		return bdderror
+		return nil
 	}
 	b.error = fmt.Errorf(format, a...)
 	if _DEBUG {
 		log.Println(b.error)
 	}
-	return bdderror
+	return nil
 }
 
 // check performs a sanity check prior to accessing a node and return eventual

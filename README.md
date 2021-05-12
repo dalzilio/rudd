@@ -54,7 +54,7 @@ with Go.
 ## Installation
 
 ```
-$ go get github.com/dalzilio/rudd
+go get github.com/dalzilio/rudd
 ```
 
 ## Overview
@@ -70,7 +70,7 @@ BuDDy is a mature software library, that has been used on several projects, with
 performances on par with more complex libraries, such as
 [CUDD](https://davidkebo.com/cudd). You can find a comparative study of the
 performances for several BDD libraries in this paper
-[\[DHJ+2015\]](https://www.tvandijk.nl/pdf/2015setta.pdf). 
+[\[DHJ+2015\]](https://www.tvandijk.nl/pdf/2015setta.pdf).
 
 Experiences have shown that there is no significant loss of performance when
 using BuDDy from a functional language with garbage collection, compared to
@@ -144,7 +144,6 @@ func main() {
   fmt.Printf("Number of sat. assignments: %s\n", bdd.Satcount(n3))
 }
 ```
-
 
 ## Dependencies
 

@@ -36,7 +36,7 @@ func (b *buddy) retnode(n int) Node {
 			log.Print(b.Error())
 			log.Panicf("b.retnode(%d) not valid\n", n)
 		}
-		return bdderror
+		return nil
 	}
 	if n == 0 {
 		return bddzero
@@ -61,8 +61,6 @@ func (b *buddy) retnode(n int) Node {
 var bddone Node = inode(1)
 
 var bddzero Node = inode(0)
-
-var bdderror Node = inode(-1)
 
 // _MINFREENODES is the minimal number of nodes (%) that has to be left after a
 // garbage collect unless a resize should be done.

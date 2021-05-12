@@ -134,11 +134,6 @@ func (b *buddy) From(v bool) Node {
 	return bddzero
 }
 
-// ErrorValue returns the constant used to check for errors
-func (b *buddy) ErrorValue() Node {
-	return bdderror
-}
-
 // ************************************************************
 
 // Ithvar returns a BDD representing the i'th variable on success, otherwise we

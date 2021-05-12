@@ -185,16 +185,16 @@ func (b *buddy) markrec(n int) {
 // }
 
 // markcount returns the number of successors of the node n and mark them.
-func (b *buddy) markcount(n int) int {
-	if n < 2 {
-		return 0
-	}
-	if b.ismarked(n) || (b.nodes[n].low == -1) {
-		return 0
-	}
-	b.marknode(n)
-	return 1 + b.markcount(b.nodes[n].low) + b.markcount(b.nodes[n].high)
-}
+// func (b *buddy) markcount(n int) int {
+// 	if n < 2 {
+// 		return 0
+// 	}
+// 	if b.ismarked(n) || (b.nodes[n].low == -1) {
+// 		return 0
+// 	}
+// 	b.marknode(n)
+// 	return 1 + b.markcount(b.nodes[n].low) + b.markcount(b.nodes[n].high)
+// }
 
 func (b *buddy) unmarkall() {
 	for k, v := range b.nodes {

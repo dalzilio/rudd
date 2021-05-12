@@ -405,7 +405,7 @@ func (b *buddy) Exist(n, varset Node) Node {
 		return b.seterror("Wrong varset in call to Exist (%d)", *varset)
 	}
 	if err := b.quantset2cache(*varset); err != nil {
-		return bdderror
+		return nil
 	}
 	if *varset < 2 { // we have an empty set or a constant
 		return n
@@ -471,7 +471,7 @@ func (b *buddy) AppEx(left Node, right Node, op Operator, varset Node) Node {
 		return b.seterror("Wrong operand in call to AppEx %s(right: %d)", op, *right)
 	}
 	if err := b.quantset2cache(*varset); err != nil {
-		return bdderror
+		return nil
 	}
 
 	b.applycache.op = OPor
