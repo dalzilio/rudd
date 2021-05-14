@@ -26,8 +26,7 @@ import (
 //      X . . .
 //      . . X .
 func nqueens_system(N int) *big.Int {
-	bdd := Buddy(N*N*256, 10000)
-	bdd.SetVarnum(N * N)
+	bdd := Buddy(N*N, N*N*256, 10000)
 	queen := bdd.True()
 	X := make([][]Node, N)
 	for i := range X {

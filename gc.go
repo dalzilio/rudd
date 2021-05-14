@@ -9,9 +9,15 @@ import (
 	"runtime"
 )
 
-// gcStat stores status information about garbage collections. We use a stack
+// gcstat stores status information about garbage collections. We use a stack
 // (slice) of objects to record the sequence of GC during a computation.
-type gcStat struct {
+type gcstat struct {
+	setfinalizers    uint64    // Total number of external references to BDD nodes
+	calledfinalizers uint64    // Number of external references that were freed
+	history          []gcpoint // Snaphot of GC stats at each occurrence
+}
+
+type gcpoint struct {
 	nodes            int // Total number of allocated nodes in the nodetable
 	freenodes        int // Number of free nodes in the nodetable
 	setfinalizers    int // Total number of external references to BDD nodes
@@ -90,17 +96,17 @@ func (b *buddy) gbc() {
 
 	// we append the current stats to the GC history
 	if _DEBUG {
-		b.gchistory = append(b.gchistory, gcStat{
+		b.gcstat.history = append(b.gcstat.history, gcpoint{
 			nodes:            len(b.nodes),
 			freenodes:        b.freenum,
-			setfinalizers:    int(b.setfinalizers),
-			calledfinalizers: int(b.calledfinalizers),
+			setfinalizers:    int(b.gcstat.setfinalizers),
+			calledfinalizers: int(b.gcstat.calledfinalizers),
 		})
 		if _LOGLEVEL > 0 {
-			log.Printf("runtime.GC() reclaimed %d references\n", b.calledfinalizers)
+			log.Printf("runtime.GC() reclaimed %d references\n", b.gcstat.calledfinalizers)
 		}
-		b.setfinalizers = 0
-		b.calledfinalizers = 0
+		b.gcstat.setfinalizers = 0
+		b.gcstat.calledfinalizers = 0
 	}
 	// we mark the nodes in the refstack to avoid collecting them
 	for _, r := range b.refstack {

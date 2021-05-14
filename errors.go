@@ -41,7 +41,6 @@ func (b *buddy) checkptr(n Node) error {
 	switch {
 	case n == nil:
 		panic("uncaught error")
-		// return b.error
 	case (*n < 0) || (*n >= len(b.nodes)):
 		b.seterror("Illegal acces to node %d", n)
 		return b.error

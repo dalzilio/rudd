@@ -31,10 +31,10 @@ func (b *buddy) Stats() string {
 }
 
 func (b *buddy) gcstats() string {
-	res := fmt.Sprintf("# of GC:    %d\n", len(b.gchistory))
-	allocated := int(b.setfinalizers)
-	reclaimed := int(b.calledfinalizers)
-	for _, g := range b.gchistory {
+	res := fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history)+1)
+	allocated := int(b.gcstat.setfinalizers)
+	reclaimed := int(b.gcstat.calledfinalizers)
+	for _, g := range b.gcstat.history {
 		allocated += g.setfinalizers
 		reclaimed += g.calledfinalizers
 	}

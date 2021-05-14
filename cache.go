@@ -12,8 +12,8 @@ import (
 // ************************************************************
 // cache is used for caching apply/exist etc. results
 type cache struct {
-	cacheratio int // value used to resize the caches as a factor of the number of nodes
-	table      []cacheData
+	ratio int // value used to resize the caches as a factor of the number of nodes
+	table []cacheData
 }
 
 // cacheStat stores status information about cache usage
@@ -97,18 +97,20 @@ const cacheid_APPEX int = 0x3
 
 // Basic functions shared by all caches
 
-func (bc *cache) cacheinit(size int) {
+func (bc *cache) cacheinit(size, ratio int) {
 	// we never check if the creation of the slice panic because of lack of memory
 	size = bdd_prime_gte(size)
 	bc.table = make([]cacheData, size)
+	bc.ratio = ratio
 	bc.cachereset()
 }
 
 func (bc *cache) cacheresize(size int) {
 	// OPTIM: reuse the existing slice and append to it, or take a subslice if
 	// we shrink the cache; not sure if it is possible
-	if bc.cacheratio > 0 {
-		bc.cacheinit(size / bc.cacheratio)
+	if bc.ratio > 0 {
+		size = bdd_prime_gte(size / bc.ratio)
+		bc.table = make([]cacheData, size)
 		return
 	}
 	bc.cachereset()
@@ -123,24 +125,22 @@ func (bc *cache) cachereset() {
 // *************************************************************************
 // Setup and shutdown
 
-func (b *buddy) cacheinit(cachesize int) {
+func (b *buddy) cacheinit(size, ratio int) {
 	b.quantset = make([]int32, 0)
-	if cachesize <= 0 {
-		cachesize = len(b.nodes)/5 + 1
+	if size <= 0 {
+		size = len(b.nodes)/5 + 1
 	}
-	cachesize = bdd_prime_gte(cachesize)
-	b.applycache = &applycache{}
-	b.applycache.cacheinit(cachesize)
-	b.itecache = &itecache{}
-	b.itecache.cacheinit(cachesize)
-	b.quantcache = &quantcache{}
-	b.quantcache.cacheinit(cachesize)
-	b.appexcache = &appexcache{}
-	b.appexcache.cacheinit(cachesize)
-	// b.misccache = &misccache{}
-	// b.misccache.cacheinit(cachesize)
-	b.replacecache = &replacecache{}
-	b.replacecache.cacheinit(cachesize)
+	size = bdd_prime_gte(size)
+	b.applycache = applycache{}
+	b.applycache.cacheinit(size, ratio)
+	b.itecache = itecache{}
+	b.itecache.cacheinit(size, ratio)
+	b.quantcache = quantcache{}
+	b.quantcache.cacheinit(size, ratio)
+	b.appexcache = appexcache{}
+	b.appexcache.cacheinit(size, ratio)
+	b.replacecache = replacecache{}
+	b.replacecache.cacheinit(size, ratio)
 }
 
 func (b *buddy) cachereset() {
@@ -148,7 +148,6 @@ func (b *buddy) cachereset() {
 	b.itecache.cachereset()
 	b.quantcache.cachereset()
 	b.appexcache.cachereset()
-	// b.misccache.cachereset()
 	b.replacecache.cachereset()
 }
 
@@ -157,36 +156,7 @@ func (b *buddy) cacheresize() {
 	b.itecache.cacheresize(len(b.nodes))
 	b.quantcache.cacheresize(len(b.nodes))
 	b.appexcache.cacheresize(len(b.nodes))
-	// b.misccache.cacheresize(len(b.nodes))
 	b.replacecache.cacheresize(len(b.nodes))
-}
-
-// *************************************************************************
-
-// SetCacheratio sets the cache ratio for the operator caches.
-//
-// The ratio between the number of nodes in the BDD table and the number of
-// entries in the operator cachetables is called the cache ratio. So a cache
-// ratio of say, four, allocates one cache entry for each four unique node
-// entries. This value can be set to any positive value. When this is done the
-// caches are resized instantly to fit the new ratio. The default is a fixed
-// cache size determined at initialization time.
-func (b *buddy) SetCacheratio(r int) error {
-	if r <= 0 {
-		b.seterror("Negative ratio (%d) in call to SetCacheratio", r)
-		return b.error
-	}
-	if len(b.nodes) == 0 {
-		return nil
-	}
-	b.applycache.cacheratio = r
-	b.itecache.cacheratio = r
-	b.quantcache.cacheratio = r
-	b.appexcache.cacheratio = r
-	// b.misccache.cacheratio = r
-	b.replacecache.cacheratio = r
-	b.cacheresize()
-	return nil
 }
 
 // ************************************************************

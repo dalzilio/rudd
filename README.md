@@ -1,6 +1,6 @@
-
 <!-- PROJECT LOGO -->
 <br />
+
 <p align="center">
   <a href="https://github.com/dalzilio/rudd">
     <img src="./docs/rudd1.png" alt="Logo" width="280">
@@ -18,8 +18,7 @@
 ## About
 
 RuDD is a Binary Decision Diagram (BDD) library written in pure Go, without the
-need for CGo or any other dependendencies. A
-[BDD](https://en.wikipedia.org/wiki/Binary_decision_diagram) is a data structure
+need for CGo or any other dependencies. A [BDD](https://en.wikipedia.org/wiki/Binary_decision_diagram) is a data structure
 used to efficiently represent Boolean functions or, equivalently, sets of
 Boolean vectors. It has nothing to do with Behaviour Driven Development testing.
 
@@ -134,10 +133,9 @@ import (
 )
 
 func main() {
-  // create a new BDD with 10 000 nodes and a cache size of 5 000 (initially),
+  // create a new BDD with 6 variables, 10 000 nodes and a cache size of 5 000 (initially),
   // with an implementation based on the BuDDY approach
-  bdd := rudd.Buddy(10000, 5000)
-  bdd.SetVarnum(6)
+  bdd := rudd.Buddy(6, 10000, 5000)
   // n1 == x2 & x3 & x5
   n1 := bdd.Makeset([]int{2, 3, 5})
   // n2 == x1 | !x3 | x4

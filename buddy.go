@@ -9,16 +9,22 @@ import (
 	"sync/atomic"
 )
 
+// bdd is the structure shared by all implementations of BDD where we use
+// integer as the key for Nodes.
+type bdd struct {
+	varnum   int32    // number of BDD variables
+	varset   [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
+	refstack []int    // Internal node reference stack
+	error             // Error status to help chain operations
+}
+
 // buddy implements a Binary Decision Diagram using the data structures and
 // algorithms found in the BuDDy library.
 type buddy struct {
+	bdd
 	nodes           []buddyNode // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	freenum         int         // Number of free nodes
 	freepos         int         // First free node
-	varnum          int32       // number of BDD variables
-	varset          [][2]int    // Set of variables used: we have a pair for each variable for its positive and negative occurrence
-	refstack        []int       // Internal node reference stack
-	error                       // Error status to help chain operations
 	nodefinalizer   interface{} // Finalizer used to decrement the ref count of external references
 	maxnodesize     int         // Maximum total number of nodes (0 if no limit)
 	maxnodeincrease int         // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
@@ -27,41 +33,47 @@ type buddy struct {
 	quantsetID      int32       // Current id used in quantset
 	quantlast       int32       // Current last variable to be quant.
 	bddStats                    // Information about the BDD
-	gchistory       []gcStat    // Information about garbage collections
+	gcstat                      // Information about garbage collections
 	cacheStat                   // Information about the caches
-	*applycache                 // Cache for apply results
-	*itecache                   // Cache for ITE results
-	*quantcache                 // Cache for exist/forall results
-	*appexcache                 // Cache for AppEx results
-	*replacecache               // Cache for Replace results
+	applycache                  // Cache for apply results
+	itecache                    // Cache for ITE results
+	quantcache                  // Cache for exist/forall results
+	appexcache                  // Cache for AppEx results
+	replacecache                // Cache for Replace results
 }
 
 // ************************************************************
 
 // bddStats stores status information about a BDD.
 type bddStats struct {
-	produced         int    // Total number of new nodes ever produced
-	setfinalizers    uint64 // Total number of external references to BDD nodes since the last GC
-	calledfinalizers uint64 // Number of external references that were freed since the last GC
+	produced int // Total number of new nodes ever produced
 }
 
 // ************************************************************
 
-// Buddy initializes a new BDD implementing the algorithms in the BuDDy library.
-// Parameter *nodesize* is the initial number of nodes in the nodetable and
-// *cachesize* is the fixed size of the internal caches. Typical values for
-// *nodesize* are 10 000 nodes for small test examples and up to 1 000 000 nodes
-// for large examples. A cache size of 10 000 seems to work good even for large
-// examples, but lesser values should do it for smaller examples.
+// Buddy initializes a new BDD implementing the algorithms in the BuDDy library,
+// wher varnum is the number of variables in the BDD, and nodesize is the size
+// of the initial node table. Typical values for nodesize are 10 000 nodes for
+// small test examples and up to 1 000 000 nodes for large examples.
 //
-// The number of cache entries can also be set to depend on the size of the
-// nodetable using a call to *SetCacheRatio*.
+// You can specify optional (int) parameters. Values after the first two
+// optional parameters will not be taken into account. The first value is to
+// specify a cachesize for the internal caches. (A cache size of 10 000 seems to
+// work good even for large examples, but lesser values should do it for smaller
+// examples.) A second extra value is used to set a "cache ratio" so that caches
+// can grow each time we resize the node table. With a cache ratio of r, there
+// is one available slot in the cache for every r slots in the node table. (A
+// typical value for the cache ratio is 4 or 5).  A cache ratio of 0 (the
+// default) means that the cache size is fixed.
 //
 // The initial number of nodes is not critical since the table will be resized
 // whenever there are too few nodes left after a garbage collection. But it does
 // have some impact on the efficency of the operations.
-func Buddy(nodesize int, cachesize int) Set {
+func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
 	b := &buddy{}
+	if nodesize < 2*varnum+2 {
+		nodesize = 2*varnum + 2
+	}
 	nodesize = bdd_prime_gte(nodesize)
 	b.minfreenodes = _MINFREENODES
 	b.maxnodeincrease = _DEFAULTMAXNODEINC
@@ -85,16 +97,27 @@ func Buddy(nodesize int, cachesize int) Set {
 	b.nodes[1].low = 1
 	b.nodes[1].high = 1
 	// setting the last fields of b
-	b.cacheinit(cachesize)
+	cachesize := 0
+	cacheratio := 0
+	if len(cachesizes) == 0 {
+		cachesize = (10000)
+	}
+	if len(cachesizes) >= 1 {
+		cachesize = cachesizes[0]
+	}
+	if len(cachesizes) >= 2 {
+		cacheratio = cachesizes[1]
+	}
+	b.cacheinit(cachesize, cacheratio)
 	b.freepos = 2
 	b.freenum = nodesize - 2
-	b.varnum = 0
-	b.gchistory = make([]gcStat, 0)
+	b.setVarnum(varnum)
+	b.gcstat.history = make([]gcpoint, 0)
 	b.maxnodeincrease = _DEFAULTMAXNODEINC
 	b.error = nil
 	b.nodefinalizer = func(n *int) {
 		if _DEBUG {
-			atomic.AddUint64(&(b.calledfinalizers), 1)
+			atomic.AddUint64(&(b.gcstat.calledfinalizers), 1)
 			if _LOGLEVEL > 2 {
 				log.Printf("dec refcou %d\n", *n)
 			}

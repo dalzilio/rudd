@@ -15,8 +15,7 @@ import (
 // of size. For this system, we have an anlytical formula to compute the size of
 // the state space.
 func milner_system(size, N int, fast bool) (Set, Node, error) {
-	bdd := Buddy(size, 50000)
-	bdd.SetVarnum(N * 6)
+	bdd := Buddy(N*6, size, 50000, 4)
 
 	c := make([]Node, N)
 	cp := make([]Node, N)

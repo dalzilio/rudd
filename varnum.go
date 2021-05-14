@@ -6,29 +6,18 @@ package rudd
 
 import "log"
 
-// SetVarnum sets the number of BDD variables. This function is used to define
-// the number of variables used in the BDD package. It may be called more than
-// one time, but only to increase the number of variables.
-func (b *buddy) SetVarnum(num int) error {
-	oldvarnum := b.varnum
+// setVarnum sets the number of BDD variables. We call this function only once
+// during initialization and generate the list used for Ithvar and NIthvar.
+func (b *buddy) setVarnum(num int) error {
 	inum := int32(num)
 	if (inum < 1) || (inum > _MAXVAR) {
-		b.seterror("Bad number of variable (%d) in setvarnum", inum)
+		b.seterror("bad number of variable (%d) in setVarnum", inum)
 		return b.error
 	}
-	if inum < b.varnum {
-		b.seterror("Trying to decrease the number of variables in SetVarnum (from %d to %d)", b.varnum, inum)
-		return b.error
-	}
-	if inum == b.varnum {
-		return b.error
-	}
-
+	b.varnum = inum
 	// We create new slices for the fields related to the list of variables:
 	// varset, level2var, var2level.
-	tmpvarset := b.varset
 	b.varset = make([][2]int, inum)
-	copy(b.varset, tmpvarset)
 
 	// Constants always have the highest level.
 	b.nodes[0].level = inum
@@ -37,25 +26,22 @@ func (b *buddy) SetVarnum(num int) error {
 	// We also initialize the refstack.
 	b.refstack = make([]int, 0, 2*inum+4)
 	b.initref()
-	for ; b.varnum < inum; b.varnum++ {
-		v0 := b.makenode(b.varnum, 0, 1)
+	for k := int32(0); k < inum; k++ {
+		v0 := b.makenode(k, 0, 1)
 		if v0 < 0 {
-			b.varnum = oldvarnum
-			b.seterror("Cannot allocate new variable %d in SetVarnum; %s", b.varnum, b.error)
+			b.seterror("cannot allocate new variable %d in setVarnum; %s", b.varnum, b.error)
 			return b.error
 		}
 		b.pushref(v0)
-		v1 := b.makenode(b.varnum, 1, 0)
+		v1 := b.makenode(k, 1, 0)
 		if v1 < 0 {
-			b.varnum = oldvarnum
-			b.seterror("Cannot allocate new variable %d in SetVarnum; %s", b.varnum, b.error)
+			b.seterror("cannot allocate new variable %d in setVarnum; %s", b.varnum, b.error)
 			return b.error
-
 		}
 		b.popref(1)
-		b.varset[b.varnum] = [2]int{v0, v1}
-		b.nodes[b.varset[b.varnum][0]].refcou = _MAXREFCOUNT
-		b.nodes[b.varset[b.varnum][1]].refcou = _MAXREFCOUNT
+		b.varset[k] = [2]int{v0, v1}
+		b.nodes[b.varset[k][0]].refcou = _MAXREFCOUNT
+		b.nodes[b.varset[k][1]].refcou = _MAXREFCOUNT
 	}
 
 	// We also need to resize the quantification cache
@@ -68,14 +54,14 @@ func (b *buddy) SetVarnum(num int) error {
 	return nil
 }
 
-// *************************************************************************
+// // *************************************************************************
 
-// ExtVarnum extends the current number of allocated BDD variables with num
-// extra variables
-func (b *buddy) ExtVarnum(num int) error {
-	if (num < 0) || (num > 0x3FFFFFFF) {
-		b.seterror("Bad choice of value (%d) when extending varnum in ExtVarnum", num)
-		return b.error
-	}
-	return b.SetVarnum(int(b.varnum) + num)
-}
+// // ExtVarnum extends the current number of allocated BDD variables with num
+// // extra variables
+// func (b *buddy) ExtVarnum(num int) error {
+// 	if (num < 0) || (num > 0x3FFFFFFF) {
+// 		b.seterror("Bad choice of value (%d) when extending varnum in ExtVarnum", num)
+// 		return b.error
+// 	}
+// 	return b.SetVarnum(int(b.varnum) + num)
+// }

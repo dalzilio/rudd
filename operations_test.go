@@ -35,8 +35,7 @@ func TestMinus(t *testing.T) {
 //********************************************************************************************
 
 func TestIte_1(t *testing.T) {
-	bdd := Buddy(5000, 50)
-	bdd.SetVarnum(4)
+	bdd := Buddy(4, 5000, 50)
 	n1 := bdd.Makeset([]int{0, 2, 3})
 	n2 := bdd.Makeset([]int{0, 3})
 	actual := bdd.Equiv(bdd.Ite(n1, n2, bdd.Not(n2)), bdd.Or(bdd.And(n1, n2), bdd.And(bdd.Not(n1), bdd.Not(n2))))
@@ -52,9 +51,8 @@ func TestIte_1(t *testing.T) {
 // are detected.
 
 func TestOperations(t *testing.T) {
-	bdd := Buddy(1000, 1000)
-	bdd.SetVarnum(4)
 	varnum := 4
+	bdd := Buddy(varnum, 1000, 1000)
 
 	test1_check := func(x Node) error {
 		allsatBDD := x

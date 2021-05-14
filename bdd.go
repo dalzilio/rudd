@@ -23,10 +23,6 @@ type BDD interface {
 	// error by returning nil.
 	Error() string
 
-	// SetVarnum sets the number of BDD variables. It may be called more than
-	// once, but only to increase the number of variables.
-	SetVarnum(num int) error
-
 	// Varnum returns the number of defined variables.
 	Varnum() int
 
