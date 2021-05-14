@@ -9,7 +9,7 @@
   <p align="center">
    RuDD,a library for Binary Decision Diagrams in Go.
     <br />
-    <a href="https://github.com/dalzilio/mcc#features"><strong>see what's new »</strong></a>
+    <a href="https://github.com/dalzilio/rudd#features"><strong>see what's new »</strong></a>
     <br />
     <!-- <a href="https://github.com/dalzilio/mcc">View Demo</a> -->
   </p>
@@ -158,9 +158,9 @@ modules and has been tested with Go 1.16.
 
 ## License
 
-This software is distributed under the [Apache-2.0
-License](https://www.apache.org/licenses/LICENSE-2.0). A copy of the license
-agreement is found in the [LICENSE](./LICENSE) file.
+This software is distributed under the [MIT
+License](https://opensource.org/licenses/MIT). A copy of the license agreement
+is found in the [LICENSE](./LICENSE.md) file.
 
 The original C code for BuDDy was released under a very permissive license that
 is included in the accompanying [NOTICE](./NOTICE) file, together with a list of
