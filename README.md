@@ -118,7 +118,12 @@ understanding of how the library can be used.
 
 ## Usage
 
-You can find several examples in the `*_test.go` files.
+You can find several examples in the `*_test.go` files. 
+
+To get access to better statistics about caches and garbage collection, as well
+as to unlock logging of some operations, you can compile your executable with
+the build tag `debug`, for instance with a directive such as `go run -tags debug
+mycmd`.
 
 ```go
 package main
@@ -139,16 +144,17 @@ func main() {
   n2 := bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4))
   // n3 == ∃ x2,x3,x5 . (n2 & x3)
   n3 := bdd.AndExist(n1, n2, bdd.Ithvar(3))
-  // you can print the result and also export a BDD in Graphviz's DOT format
+  // you can print the result or export a BDD in Graphviz's DOT format
   bdd.PrintDot("out.dot", n3)
   fmt.Printf("Number of sat. assignments: %s\n", bdd.Satcount(n3))
+  fmt.Println(bdd.Stats())
 }
 ```
 
 ## Dependencies
 
-The library has no dependencies ouside the standard Go library. The library uses
-Go modules and has been tested with Go 1.16.
+The library has no dependencies outside of the standard Go library. It uses Go
+modules and has been tested with Go 1.16.
 
 ## License
 
