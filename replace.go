@@ -103,8 +103,11 @@ func (b *buddy) Replace(n Node, r Replacer) Node {
 		return b.seterror("wrong operand in call to Replace (%d)", *n)
 	}
 	b.initref()
+	b.pushref(*n)
 	b.replacecache.id = r.Id()
-	return b.retnode(b.replace(*n, r))
+	res := b.retnode(b.replace(*n, r))
+	b.popref(1)
+	return res
 }
 
 func (b *buddy) replace(n int, r Replacer) int {
