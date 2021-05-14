@@ -4,7 +4,7 @@
 
 package rudd
 
-type bddNode struct {
+type buddyNode struct {
 	refcou int32 // Count the number of external references
 	level  int32 // Order of the variable in the BDD
 	low    int   // Reference to the false branch
@@ -12,6 +12,19 @@ type bddNode struct {
 	hash   int   // Index where to (possibly) find node with this hash value
 	next   int   // Next index to check in case of a collision, 0 if last
 }
+
+// ************************************************************
+
+// inode returns a Node for known nodes, such as variables, that do not need to
+// increase their reference count.
+func inode(n int) Node {
+	x := n
+	return &x
+}
+
+var bddone Node = inode(1)
+
+var bddzero Node = inode(0)
 
 // ************************************************************
 

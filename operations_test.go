@@ -40,7 +40,6 @@ func TestIte_1(t *testing.T) {
 	n1 := bdd.Makeset([]int{0, 2, 3})
 	n2 := bdd.Makeset([]int{0, 3})
 	actual := bdd.Equiv(bdd.Ite(n1, n2, bdd.Not(n2)), bdd.Or(bdd.And(n1, n2), bdd.And(bdd.Not(n1), bdd.Not(n2))))
-	bdd.PrintDot("aa")
 	if actual != bdd.True() {
 		t.Errorf("ite(f,g,h) <=> (f or g) and (-f or h): expected true, actual false")
 	}

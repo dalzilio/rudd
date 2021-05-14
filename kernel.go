@@ -11,13 +11,6 @@ import (
 	"sync/atomic"
 )
 
-// inode returns a Node for known nodes, such as variables, that do not need to
-// increase their reference count.
-func inode(n int) Node {
-	x := n
-	return &x
-}
-
 // retnode creates a Node for external use and sets a finalizer on it so that we
 // can reclaim the ressource during GC.
 func (b *buddy) retnode(n int) Node {
@@ -47,10 +40,6 @@ func (b *buddy) retnode(n int) Node {
 	}
 	return &x
 }
-
-var bddone Node = inode(1)
-
-var bddzero Node = inode(0)
 
 // _MINFREENODES is the minimal number of nodes (%) that has to be left after a
 // garbage collect unless a resize should be done.
@@ -171,7 +160,7 @@ func (b *buddy) noderesize() error {
 	// FIXME: we could replace realloc with making a bigger slice and copying
 	// values.
 	tmp := b.nodes
-	b.nodes = make([]bddNode, nodesize)
+	b.nodes = make([]buddyNode, nodesize)
 	copy(b.nodes, tmp)
 	tmp = nil
 
@@ -212,23 +201,6 @@ func (b *buddy) noderesize() error {
 
 	return nil
 }
-
-// *************************************************************************
-
-// func (b *BDD) allocnode(n int) {
-// 	if n >= b.nodesize {
-// 		b.seterror("Trying to alloc node at a bad location (%d)", n)
-// 		return
-// 	}
-// 	b.nodes[n] = bddNode{
-// 		refcou: 0,
-// 		level:  0,
-// 		low:    -1,
-// 		high:   0,
-// 		hash:   0,
-// 		next:   n + 1,
-// 	}
-// }
 
 // *************************************************************************
 

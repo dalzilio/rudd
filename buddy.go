@@ -12,7 +12,7 @@ import (
 // buddy implements a Binary Decision Diagram using the data structures and
 // algorithms found in the BuDDy library.
 type buddy struct {
-	nodes           []bddNode   // List of all the BDD nodes. Constants are always kept at index 0 and 1
+	nodes           []buddyNode // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	freenum         int         // Number of free nodes
 	freepos         int         // First free node
 	varnum          int32       // number of BDD variables
@@ -66,9 +66,9 @@ func Buddy(nodesize int, cachesize int) Set {
 	b.minfreenodes = _MINFREENODES
 	b.maxnodeincrease = _DEFAULTMAXNODEINC
 	// initializing the list of nodes
-	b.nodes = make([]bddNode, nodesize)
+	b.nodes = make([]buddyNode, nodesize)
 	for k := range b.nodes {
-		b.nodes[k] = bddNode{
+		b.nodes[k] = buddyNode{
 			refcou: 0,
 			level:  0,
 			low:    -1,
@@ -102,26 +102,6 @@ func Buddy(nodesize int, cachesize int) Set {
 		b.nodes[*n].refcou--
 	}
 	return Set{b}
-}
-
-// ************************************************************
-
-// True returns the constant true BDD
-func (b *buddy) True() Node {
-	return bddone
-}
-
-// False returns the constant false BDD
-func (b *buddy) False() Node {
-	return bddzero
-}
-
-// From returns a (constant) Node from a boolean value.
-func (b *buddy) From(v bool) Node {
-	if v {
-		return bddone
-	}
-	return bddzero
 }
 
 // ************************************************************

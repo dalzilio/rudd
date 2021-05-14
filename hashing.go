@@ -7,17 +7,15 @@ package rudd
 // Hash functions
 
 func _TRIPLE(a, b, c, len int) int {
-	return int(_PAIR64(uint64(c), _PAIR(a, b, len), uint64(len)))
+	return int(_PAIR(c, _PAIR(a, b, len), len))
 }
 
 // _PAIR is a mapping function that maps (bijectively) a pair of integer (a, b)
 // into a unique integer. It is therefore a perfect hash: no collisions
-func _PAIR(a, b, len int) uint64 {
-	return (((uint64(a+b) * uint64(a+b+1)) / 2) + uint64(a)) % uint64(len)
-}
-
-func _PAIR64(a, b, len uint64) uint64 {
-	return (((((a + b) % len) * ((a + b + 1) % len)) / 2) + a) % len
+func _PAIR(a, b, len int) int {
+	ua := uint64(a)
+	ub := uint64(b)
+	return int(((((ua + ub) * (ua + ub + 1)) / 2) + (ua)) % uint64(len))
 }
 
 // ************************************************************
@@ -139,7 +137,7 @@ func (b *buddy) setquant(n int, res int) int {
 // The hash function for AppEx is #(left, right)
 
 func (b *buddy) matchappex(left, right int) int {
-	entry := b.appexcache.table[int(_PAIR(left, right, len(b.appexcache.table)))]
+	entry := b.appexcache.table[_PAIR(left, right, len(b.appexcache.table))]
 	if entry.a == left && entry.b == right && entry.c == b.appexcache.id {
 		return entry.res
 	}
@@ -151,7 +149,7 @@ func (b *buddy) setappex(left, right, res int) int {
 		b.seterror("problem in call to appex")
 		return -1
 	}
-	b.appexcache.table[int(_PAIR(left, right, len(b.appexcache.table)))] = cacheData{
+	b.appexcache.table[_PAIR(left, right, len(b.appexcache.table))] = cacheData{
 		a:   left,
 		b:   right,
 		c:   b.appexcache.id,

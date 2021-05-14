@@ -19,7 +19,8 @@ type Set struct {
 // Diagrams.
 type BDD interface {
 	// Error returns the error status of the BDD. We return an empty string if
-	// there are no errors.
+	// there are no errors. Functions that return a Node result will signal an
+	// error by returning nil.
 	Error() string
 
 	// SetVarnum sets the number of BDD variables. It may be called more than
@@ -28,15 +29,6 @@ type BDD interface {
 
 	// Varnum returns the number of defined variables.
 	Varnum() int
-
-	// True returns the Node for the constant true.
-	True() Node
-
-	// False returns the Node for the constant false.
-	False() Node
-
-	// From returns a (constant) Node from a boolean value.
-	From(v bool) Node
 
 	// Ithvar returns a BDD representing the i'th variable on success. The
 	// requested variable must be in the range [0..Varnum).
@@ -120,9 +112,6 @@ type BDD interface {
 	// // the BDD.
 	// DelRef(n Node) Node
 
-	// // GC explitly starts garbage collection of unused nodes.
-	// GC()
-
 	// Stats returns information about the BDD
 	Stats() string
 }
@@ -185,3 +174,23 @@ func (b Set) AndExist(varset, n1, n2 Node) Node {
 }
 
 // *************************************************************************
+
+// True returns the constant true BDD
+func (b Set) True() Node {
+	return bddone
+}
+
+// False returns the constant false BDD
+func (b Set) False() Node {
+	return bddzero
+}
+
+// From returns a (constant) Node from a boolean value.
+func (b Set) From(v bool) Node {
+	if v {
+		return bddone
+	}
+	return bddzero
+}
+
+// ************************************************************

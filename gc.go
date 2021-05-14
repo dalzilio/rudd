@@ -69,11 +69,6 @@ func (b *buddy) DelRef(n Node) Node {
 
 // *************************************************************************
 
-// GC starts garbage collection on the nodes.
-func (b *buddy) GC() {
-	b.gbc()
-}
-
 // gbc is the garbage collector called for reclaiming memory, inside a call to
 // makenode, when there are no free positions available. Allocated nodes that
 // are not reclaimed do not move.
