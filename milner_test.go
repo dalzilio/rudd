@@ -15,7 +15,7 @@ import (
 // of size. For this system, we have an anlytical formula to compute the size of
 // the state space.
 func milner_system(size, N int, fast bool) (Set, Node, error) {
-	bdd := Buddy(N*6, size, 50000, 4)
+	bdd := Buddy(N*6, size, size/4, 4)
 
 	c := make([]Node, N)
 	cp := make([]Node, N)
@@ -118,7 +118,7 @@ func TestMilnerSlow(t *testing.T) {
 func TestMilner(t *testing.T) {
 	for _, N := range []int{16, 20, 30, 50} {
 		// we choose a small size to stress test garbage collection
-		bdd, R, err := milner_system(100, N, true)
+		bdd, R, err := milner_system(100000, N, true)
 		if err != nil {
 			t.Error(err)
 		}
@@ -152,7 +152,7 @@ func TestMilner80(t *testing.T) {
 func BenchmarkMilner(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner_system(50000, 32, true); err != nil {
+		if _, _, err := milner_system(500000, 49, true); err != nil {
 			b.Error(err)
 		}
 	}

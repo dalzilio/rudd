@@ -6,7 +6,6 @@ package rudd
 
 import (
 	"log"
-	"runtime"
 )
 
 // gcstat stores status information about garbage collections. We use a stack
@@ -90,9 +89,12 @@ func (b *buddy) gbc() {
 		return
 	}
 
-	// We run the system GC so that we can decrement the ref counts of Nodes
-	// that had an external reference. This is blocking.
-	runtime.GC()
+	// We could  explictly ask the system to run its GC so that we can decrement
+	// the ref counts of Nodes that had an external reference. This is blocking.
+	// Frequent GC is time consuming, but with fewer GC we can experience more
+	// resizing events.
+	//
+	// runtime.GC()
 
 	// we append the current stats to the GC history
 	if _DEBUG {
@@ -102,11 +104,16 @@ func (b *buddy) gbc() {
 			setfinalizers:    int(b.gcstat.setfinalizers),
 			calledfinalizers: int(b.gcstat.calledfinalizers),
 		})
+		b.gcstat.setfinalizers = 0
+		b.gcstat.calledfinalizers = 0
 		if _LOGLEVEL > 0 {
 			log.Printf("runtime.GC() reclaimed %d references\n", b.gcstat.calledfinalizers)
 		}
-		b.gcstat.setfinalizers = 0
-		b.gcstat.calledfinalizers = 0
+	} else {
+		b.gcstat.history = append(b.gcstat.history, gcpoint{
+			nodes:     len(b.nodes),
+			freenodes: b.freenum,
+		})
 	}
 	// we mark the nodes in the refstack to avoid collecting them
 	for _, r := range b.refstack {

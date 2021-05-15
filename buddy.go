@@ -15,6 +15,7 @@ type bdd struct {
 	varnum   int32    // number of BDD variables
 	varset   [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
 	refstack []int    // Internal node reference stack
+	produced int      // Total number of new nodes ever produced
 	error             // Error status to help chain operations
 }
 
@@ -32,7 +33,6 @@ type buddy struct {
 	quantset        []int32     // Current variable set for quant.
 	quantsetID      int32       // Current id used in quantset
 	quantlast       int32       // Current last variable to be quant.
-	bddStats                    // Information about the BDD
 	gcstat                      // Information about garbage collections
 	cacheStat                   // Information about the caches
 	applycache                  // Cache for apply results
@@ -40,13 +40,6 @@ type buddy struct {
 	quantcache                  // Cache for exist/forall results
 	appexcache                  // Cache for AppEx results
 	replacecache                // Cache for Replace results
-}
-
-// ************************************************************
-
-// bddStats stores status information about a BDD.
-type bddStats struct {
-	produced int // Total number of new nodes ever produced
 }
 
 // ************************************************************
@@ -99,9 +92,6 @@ func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
 	// setting the last fields of b
 	cachesize := 0
 	cacheratio := 0
-	if len(cachesizes) == 0 {
-		cachesize = (10000)
-	}
 	if len(cachesizes) >= 1 {
 		cachesize = cachesizes[0]
 	}
@@ -112,7 +102,7 @@ func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
 	b.freepos = 2
 	b.freenum = nodesize - 2
 	b.setVarnum(varnum)
-	b.gcstat.history = make([]gcpoint, 0)
+	b.gcstat.history = []gcpoint{}
 	b.maxnodeincrease = _DEFAULTMAXNODEINC
 	b.error = nil
 	b.nodefinalizer = func(n *int) {
@@ -125,6 +115,56 @@ func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
 		b.nodes[*n].refcou--
 	}
 	return Set{b}
+}
+
+// ************************************************************
+
+// setVarnum sets the number of BDD variables. We call this function only once
+// during initialization and generate the list used for Ithvar and NIthvar.
+func (b *buddy) setVarnum(num int) error {
+	inum := int32(num)
+	if (inum < 1) || (inum > _MAXVAR) {
+		b.seterror("bad number of variable (%d) in setVarnum", inum)
+		return b.error
+	}
+	b.varnum = inum
+	// We create new slices for the fields related to the list of variables:
+	// varset, level2var, var2level.
+	b.varset = make([][2]int, inum)
+
+	// Constants always have the highest level.
+	b.nodes[0].level = inum
+	b.nodes[1].level = inum
+
+	// We also initialize the refstack.
+	b.refstack = make([]int, 0, 2*inum+4)
+	b.initref()
+	for k := int32(0); k < inum; k++ {
+		v0 := b.makenode(k, 0, 1)
+		if v0 < 0 {
+			b.seterror("cannot allocate new variable %d in setVarnum; %s", b.varnum, b.error)
+			return b.error
+		}
+		b.pushref(v0)
+		v1 := b.makenode(k, 1, 0)
+		if v1 < 0 {
+			b.seterror("cannot allocate new variable %d in setVarnum; %s", b.varnum, b.error)
+			return b.error
+		}
+		b.popref(1)
+		b.varset[k] = [2]int{v0, v1}
+		b.nodes[b.varset[k][0]].refcou = _MAXREFCOUNT
+		b.nodes[b.varset[k][1]].refcou = _MAXREFCOUNT
+	}
+
+	// We also need to resize the quantification cache
+	b.quantset = make([]int32, b.varnum)
+	b.quantsetID = 0
+
+	if _LOGLEVEL > 0 {
+		log.Printf("set varnum to %d\n", b.varnum)
+	}
+	return nil
 }
 
 // ************************************************************

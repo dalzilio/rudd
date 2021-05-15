@@ -10,57 +10,6 @@ import (
 	"math/big"
 )
 
-type Operator int
-
-// Operator describe the potential (binary) operations available on an Apply.
-const (
-	OPand       Operator = iota // Boolean conjunction
-	OPxor                       // Exclusive or
-	OPor                        // Disjunction
-	OPnand                      // Negation of and
-	OPnor                       // Negation of or
-	OPimp                       // Implication
-	OPbiimp                     // Equivalence
-	OPdiff                      // Difference
-	OPless                      // Set difference
-	OPinvimp                    // Reverse implication
-	op_not                      // Negation. Should not be used in apply, but used in caches
-	op_simplify                 // same
-)
-
-var opnames = [12]string{
-	OPand:       "and",
-	OPxor:       "xor",
-	OPor:        "or",
-	OPnand:      "nand",
-	OPnor:       "nor",
-	OPimp:       "imp",
-	OPbiimp:     "biimp",
-	OPdiff:      "diff",
-	OPless:      "less",
-	OPinvimp:    "invimp",
-	op_not:      "not",
-	op_simplify: "simplify",
-}
-
-func (op Operator) String() string {
-	return opnames[op]
-}
-
-var opres = [12][2][2]int{
-	//                      00    01               10    11
-	OPand:    {0: [2]int{0: 0, 1: 0}, 1: [2]int{0: 0, 1: 1}}, // 0001
-	OPxor:    {0: [2]int{0: 0, 1: 1}, 1: [2]int{0: 1, 1: 0}}, // 0110
-	OPor:     {0: [2]int{0: 0, 1: 1}, 1: [2]int{0: 1, 1: 1}}, // 0111
-	OPnand:   {0: [2]int{0: 1, 1: 1}, 1: [2]int{0: 1, 1: 0}}, // 1110
-	OPnor:    {0: [2]int{0: 1, 1: 0}, 1: [2]int{0: 0, 1: 0}}, // 1000
-	OPimp:    {0: [2]int{0: 1, 1: 1}, 1: [2]int{0: 0, 1: 1}}, // 1101
-	OPbiimp:  {0: [2]int{0: 1, 1: 0}, 1: [2]int{0: 0, 1: 1}}, // 1001
-	OPdiff:   {0: [2]int{0: 0, 1: 0}, 1: [2]int{0: 1, 1: 0}}, // 0010
-	OPless:   {0: [2]int{0: 0, 1: 1}, 1: [2]int{0: 0, 1: 0}}, // 0100
-	OPinvimp: {0: [2]int{0: 1, 1: 0}, 1: [2]int{0: 1, 1: 1}}, // 1011
-}
-
 // *************************************************************************
 
 // Not returns the negation of the expression corresponding to node n. It
@@ -86,13 +35,7 @@ func (b *buddy) not(n int) int {
 	}
 	// The hash for a not operation is simply n
 	if res := b.matchnot(n); res >= 0 {
-		if _DEBUG {
-			b.cacheStat.opHit++
-		}
 		return res
-	}
-	if _DEBUG {
-		b.cacheStat.opMiss++
 	}
 	low := b.pushref(b.not(b.nodes[n].low))
 	high := b.pushref(b.not(b.nodes[n].high))
@@ -126,7 +69,7 @@ func (b *buddy) Apply(left Node, right Node, op Operator) Node {
 	if b.checkptr(right) != nil {
 		return b.seterror("Wrong operand in call to Apply %s(left: ..., right: %d)", op, *right)
 	}
-	b.applycache.op = op
+	b.applycache.op = int(op)
 	b.initref()
 	b.pushref(*left)
 	b.pushref(*right)
@@ -136,7 +79,7 @@ func (b *buddy) Apply(left Node, right Node, op Operator) Node {
 }
 
 func (b *buddy) apply(left int, right int) int {
-	switch b.applycache.op {
+	switch Operator(b.applycache.op) {
 	case OPand:
 		if left == right {
 			return left
@@ -236,14 +179,14 @@ func (b *buddy) apply(left int, right int) int {
 		}
 	default:
 		// unary operations, OPnot and OPsimplify, should not be used in apply
-		b.seterror("Unauthorized operation (%s) in apply", b.applycache.op)
+		b.seterror("Unauthorized operation (%s) in apply", Operator(b.applycache.op))
 		return -1
 	}
 
 	// we check for errors
 	if left < 0 || right < 0 {
 		if _DEBUG {
-			log.Panicf("panic in apply(%d,%d,%s)\n", left, right, b.applycache.op)
+			log.Panicf("panic in apply(%d,%d,%s)\n", left, right, Operator(b.applycache.op))
 		}
 		return -1
 	}
@@ -252,17 +195,8 @@ func (b *buddy) apply(left int, right int) int {
 	if (left < 2) && (right < 2) {
 		return opres[b.applycache.op][left][right]
 	}
-
-	// otherwise we check the cache
 	if res := b.matchapply(left, right); res >= 0 {
-		if _DEBUG {
-			b.cacheStat.opHit++
-		}
 		return res
-	}
-	// if we are unfortunate we continue recursively
-	if _DEBUG {
-		b.cacheStat.opMiss++
 	}
 	leftlvl := b.nodes[left].level
 	rightlvl := b.nodes[right].level
@@ -364,13 +298,7 @@ func (b *buddy) ite(f, g, h int) int {
 		return -1
 	}
 	if res := b.matchite(f, g, h); res >= 0 {
-		if _DEBUG {
-			b.cacheStat.opHit++
-		}
 		return res
-	}
-	if _DEBUG {
-		b.cacheStat.opMiss++
 	}
 	p := b.nodes[f].level
 	q := b.nodes[g].level
@@ -401,32 +329,26 @@ func (b *buddy) Exist(n, varset Node) Node {
 		return n
 	}
 
-	b.quantcache.id = (*varset << 3) | cacheid_EXIST
-	// FIXME: range, should check thet varset < 1 << (bits.UintSize - 3); but very unlikely
-	b.applycache.op = OPor
+	b.quantcache.id = cacheid_EXIST
+	b.applycache.op = int(OPor)
 	b.initref()
 	b.pushref(*n)
-	res := b.quant(*n)
-	b.popref(1)
+	b.pushref(*varset)
+	res := b.quant(*n, *varset)
+	b.popref(2)
 	return b.retnode(res)
 }
 
-func (b *buddy) quant(n int) int {
+func (b *buddy) quant(n, varset int) int {
 	if (n < 2) || (b.nodes[n].level > b.quantlast) {
 		return n
 	}
 	// the hash for a quantification operation is simply n
-	if res := b.matchquant(n); res >= 0 {
-		if _DEBUG {
-			b.cacheStat.opHit++
-		}
+	if res := b.matchquant(n, varset); res >= 0 {
 		return res
 	}
-	if _DEBUG {
-		b.cacheStat.opMiss++
-	}
-	low := b.pushref(b.quant(b.nodes[n].low))
-	high := b.pushref(b.quant(b.nodes[n].high))
+	low := b.pushref(b.quant(b.nodes[n].low, varset))
+	high := b.pushref(b.quant(b.nodes[n].high, varset))
 	var res int
 	if b.quantset[b.nodes[n].level] == b.quantsetID {
 		res = b.apply(low, high)
@@ -434,7 +356,7 @@ func (b *buddy) quant(n int) int {
 		res = b.makenode(b.nodes[n].level, low, high)
 	}
 	b.popref(2)
-	return b.setquant(n, res)
+	return b.setquant(n, varset, res)
 }
 
 // *************************************************************************
@@ -448,72 +370,75 @@ func (b *buddy) quant(n int) int {
 // returns the relational product of two BDDs.
 func (b *buddy) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	// FIXME: should check that op is a binary operation
+	if int(op) > 3 {
+		return b.seterror("operator %s not supported in call to AppEx")
+	}
 	if b.checkptr(varset) != nil {
-		return b.seterror("Wrong varset in call to AppEx (%d)", *varset)
+		return b.seterror("wrong varset in call to AppEx (%d)", *varset)
 	}
 	if *varset < 2 { // we have an empty set
 		return b.Apply(left, right, op)
 	}
 	if b.checkptr(left) != nil {
-		return b.seterror("Wrong operand in call to AppEx %s(left: %d)", op, *left)
+		return b.seterror("wrong operand in call to AppEx %s(left: %d)", op, *left)
 	}
 	if b.checkptr(right) != nil {
-		return b.seterror("Wrong operand in call to AppEx %s(right: %d)", op, *right)
+		return b.seterror("wrong operand in call to AppEx %s(right: %d)", op, *right)
 	}
 	if err := b.quantset2cache(*varset); err != nil {
 		return nil
 	}
 
-	b.applycache.op = OPor
-	b.appexcache.op = op
-	b.appexcache.id = (*varset << 5) | (int(op) << 1) /* FIXME: range! */
+	b.applycache.op = int(OPor)
+	b.appexcache.op = int(op)
+	b.appexcache.id = (*varset << 2) | b.appexcache.op
 	b.quantcache.id = (b.appexcache.id << 3) | cacheid_APPEX
 	b.initref()
 	b.pushref(*left)
 	b.pushref(*right)
 	b.pushref(*varset)
-	res := b.appquant(*left, *right)
+	res := b.appquant(*left, *right, *varset)
 	b.popref(3)
 	return b.retnode(res)
 }
 
-func (b *buddy) appquant(left, right int) int {
-	switch b.appexcache.op {
+func (b *buddy) appquant(left, right, varset int) int {
+	switch Operator(b.appexcache.op) {
 	case OPand:
 		if left == 0 || right == 0 {
 			return 0
 		}
 		if left == right {
-			return b.quant(left)
+			return b.quant(left, varset)
 		}
 		if left == 1 {
-			return b.quant(right)
+			return b.quant(right, varset)
 		}
 		if right == 1 {
-			return b.quant(left)
+			return b.quant(left, varset)
 		}
 	case OPor:
 		if left == 1 || right == 1 {
 			return 1
 		}
 		if left == right {
-			return b.quant(left)
+			return b.quant(left, varset)
 		}
 		if left == 0 {
-			return b.quant(right)
+			return b.quant(right, varset)
 		}
 		if right == 0 {
-			return b.quant(left)
+			return b.quant(left, varset)
 		}
 	case OPxor:
 		if left == right {
 			return 0
 		}
 		if left == 0 {
-			return b.quant(right)
+			return b.quant(right, varset)
 		}
 		if right == 0 {
-			return b.quant(left)
+			return b.quant(left, varset)
 		}
 	case OPnand:
 		if left == 0 || right == 0 {
@@ -553,20 +478,14 @@ func (b *buddy) appquant(left, right int) int {
 
 	// next we check if the operation is already in our cache
 	if res := b.matchappex(left, right); res >= 0 {
-		if _DEBUG {
-			b.cacheStat.opHit++
-		}
 		return res
-	}
-	if _DEBUG {
-		b.cacheStat.opMiss++
 	}
 	leftlvl := b.nodes[left].level
 	rightlvl := b.nodes[right].level
 	var res int
 	if leftlvl == rightlvl {
-		low := b.pushref(b.appquant(b.nodes[left].low, b.nodes[right].low))
-		high := b.pushref(b.appquant(b.nodes[left].high, b.nodes[right].high))
+		low := b.pushref(b.appquant(b.nodes[left].low, b.nodes[right].low, varset))
+		high := b.pushref(b.appquant(b.nodes[left].high, b.nodes[right].high, varset))
 		if b.quantset[leftlvl] == b.quantsetID {
 			res = b.apply(low, high)
 		} else {
@@ -574,16 +493,16 @@ func (b *buddy) appquant(left, right int) int {
 		}
 	} else {
 		if leftlvl < rightlvl {
-			low := b.pushref(b.appquant(b.nodes[left].low, right))
-			high := b.pushref(b.appquant(b.nodes[left].high, right))
+			low := b.pushref(b.appquant(b.nodes[left].low, right, varset))
+			high := b.pushref(b.appquant(b.nodes[left].high, right, varset))
 			if b.quantset[leftlvl] == b.quantsetID {
 				res = b.apply(low, high)
 			} else {
 				res = b.makenode(leftlvl, low, high)
 			}
 		} else {
-			low := b.pushref(b.appquant(left, b.nodes[right].low))
-			high := b.pushref(b.appquant(left, b.nodes[right].high))
+			low := b.pushref(b.appquant(left, b.nodes[right].low, varset))
+			high := b.pushref(b.appquant(left, b.nodes[right].high, varset))
 			if b.quantset[rightlvl] == b.quantsetID {
 				res = b.apply(low, high)
 			} else {

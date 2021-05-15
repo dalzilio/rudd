@@ -116,13 +116,7 @@ func (b *buddy) replace(n int, r Replacer) int {
 		return n
 	}
 	if res := b.matchreplace(n); res >= 0 {
-		if _DEBUG {
-			b.cacheStat.opHit++
-		}
 		return res
-	}
-	if _DEBUG {
-		b.cacheStat.opMiss++
 	}
 	low := b.pushref(b.replace(b.nodes[n].low, r))
 	high := b.pushref(b.replace(b.nodes[n].high, r))

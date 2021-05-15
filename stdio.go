@@ -11,36 +11,70 @@ import (
 	"os"
 	"sort"
 	"text/tabwriter"
+	"unsafe"
 )
 
 // Stats returns information about the BDD
 func (b *buddy) Stats() string {
-	res := fmt.Sprintf("Varnum:     %d\n", b.varnum)
+	res := "==============\n"
+	res += fmt.Sprintf("Varnum:     %d\n", b.varnum)
 	res += fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
 	res += fmt.Sprintf("Produced:   %d\n", b.produced)
 	r := (float64(b.freenum) / float64(len(b.nodes))) * 100
 	res += fmt.Sprintf("Free:       %d  (%.3g %%)\n", b.freenum, r)
 	res += fmt.Sprintf("Used:       %d  (%.3g %%)\n", len(b.nodes)-b.freenum, (100.0 - r))
-	res += "==============\n"
+	res += fmt.Sprintf("Size:       %s\n", humanSize(len(b.nodes), unsafe.Sizeof(buddyNode{})))
 	res += b.gcstats()
 	if _DEBUG {
 		res += "==============\n"
 		res += b.cacheStat.String()
+		res += b.applycache.String()
+		res += b.itecache.String()
+		res += b.quantcache.String()
+		res += b.appexcache.String()
+		res += b.replacecache.String()
 	}
 	return res
 }
 
 func (b *buddy) gcstats() string {
-	res := fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history)+1)
-	allocated := int(b.gcstat.setfinalizers)
-	reclaimed := int(b.gcstat.calledfinalizers)
-	for _, g := range b.gcstat.history {
-		allocated += g.setfinalizers
-		reclaimed += g.calledfinalizers
+	res := fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history))
+	if _DEBUG {
+		allocated := int(b.gcstat.setfinalizers)
+		reclaimed := int(b.gcstat.calledfinalizers)
+		for _, g := range b.gcstat.history {
+			allocated += g.setfinalizers
+			reclaimed += g.calledfinalizers
+		}
+		res += fmt.Sprintf("Ext. refs:  %d\n", allocated)
+		res += fmt.Sprintf("Reclaimed:  %d\n", reclaimed)
 	}
-	res += fmt.Sprintf("Ext. refs:  %d\n", allocated)
-	res += fmt.Sprintf("Reclaimed:  %d\n", reclaimed)
 	return res
+}
+
+var hsizes []string = []string{"k", "M", "G"}
+
+// humanSize returns a human-readable version of a size in bytes
+func humanSize(b int, unit uintptr) string {
+	b = b * int(unit)
+	if b < 0 {
+		return "(error)"
+	}
+	if b < 1000 {
+		return fmt.Sprintf("%d B", b)
+	}
+	c := 0
+	s := float64(b) / 1000.0
+	for {
+		if s < 1000 {
+			return fmt.Sprintf("%.1f %sB", s, hsizes[c])
+		}
+		s = float64(s) / 1000.0
+		c++
+		if c >= len(hsizes) {
+			return fmt.Sprintf("%.1f TB", s)
+		}
+	}
 }
 
 // ******************************************************************************************************
