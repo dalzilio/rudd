@@ -96,29 +96,13 @@ type BDD interface {
 	// 1 and 0 respectively.
 	Allnodes(f func(id, level, low, high int) error, n ...Node) error
 
-	// // AddRef increases the reference count on node n and returns n so that
-	// // calls can be easily chained together. A call to AddRef can never raise an
-	// // error, even if we access an unused node or a value outside the range of
-	// // the BDD.
-	// AddRef(n Node) Node
-
-	// // DelRef decreases the reference count on a node and returns n so that
-	// // calls can be easily chained together. A call to DelRef can never raise an
-	// // error, even if we access an unused node or a value outside the range of
-	// // the BDD.
-	// DelRef(n Node) Node
-
 	// Stats returns information about the BDD
 	Stats() string
 }
 
-// ************************************************************
-
 // Node is a reference to an element of a BDD. It represents the atomic unit of
 // interactions and computations within a BDD.
 type Node *int
-
-// ************************************************************
 
 // bdd is the structure shared by all implementations of BDD where we use
 // integer as the key for Nodes.
@@ -128,7 +112,30 @@ type bdd struct {
 	refstack []int    // Internal node reference stack
 	produced int      // Total number of new nodes ever produced
 	gcstat            // Information about garbage collections
+	configs           // Configurable parameters
+	caches            // Set of 5 caches used for the operations in the bdd
 	error             // Error status to help chain operations
+}
+
+// Varnum returns the number of defined variables.
+func (b *bdd) Varnum() int {
+	return int(b.varnum)
+}
+
+// caches is a collection of caches used for operations
+type caches struct {
+	applycache   // Cache for apply results
+	itecache     // Cache for ITE results
+	quantcache   // Cache for exist/forall results
+	appexcache   // Cache for AppEx results
+	replacecache // Cache for Replace results
+}
+
+// configs is used to store the values of different parameters of the BDD
+type configs struct {
+	maxnodesize     int // Maximum total number of nodes (0 if no limit)
+	maxnodeincrease int // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
+	minfreenodes    int // Minimum number of nodes that should be left after GC before triggering a resize
 }
 
 // inode returns a Node for known nodes, such as variables, that do not need to
@@ -142,7 +149,37 @@ var bddone Node = inode(1)
 
 var bddzero Node = inode(0)
 
-// ************************************************************
+// private functions to manipulate the refstack; used to prevent nodes that are
+// currently being built (e.g. transient nodes built during an apply) to be
+// reclaimed during GC.
+
+func (b *bdd) initref() {
+	b.refstack = b.refstack[:0]
+}
+
+func (b *bdd) pushref(n int) int {
+	b.refstack = append(b.refstack, n)
+	return n
+}
+
+func (b *bdd) popref(a int) {
+	b.refstack = b.refstack[:len(b.refstack)-a]
+}
+
+// gcstat stores status information about garbage collections. We use a stack
+// (slice) of objects to record the sequence of GC during a computation.
+type gcstat struct {
+	setfinalizers    uint64    // Total number of external references to BDD nodes
+	calledfinalizers uint64    // Number of external references that were freed
+	history          []gcpoint // Snaphot of GC stats at each occurrence
+}
+
+type gcpoint struct {
+	nodes            int // Total number of allocated nodes in the nodetable
+	freenodes        int // Number of free nodes in the nodetable
+	setfinalizers    int // Total number of external references to BDD nodes
+	calledfinalizers int // Number of external references that were freed
+}
 
 // And returns the logical 'and' of a sequence of nodes.
 func (b Set) And(n ...Node) Node {
@@ -193,8 +230,6 @@ func (b Set) AndExist(varset, n1, n2 Node) Node {
 	return b.AppEx(n1, n2, OPand, varset)
 }
 
-// *************************************************************************
-
 // True returns the constant true BDD
 func (b Set) True() Node {
 	return bddone
@@ -212,5 +247,3 @@ func (b Set) From(v bool) Node {
 	}
 	return bddzero
 }
-
-// ************************************************************

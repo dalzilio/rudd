@@ -12,7 +12,6 @@ import (
 
 // caches are used for caching apply/exist etc. results
 
-// ************************************************************
 // cacheStat stores status information about cache usage
 type cacheStat struct {
 	uniqueAccess int // accesses to the unique node table
@@ -20,8 +19,6 @@ type cacheStat struct {
 	uniqueHit    int // entries actually found in the the unique node table
 	uniqueMiss   int // entries not found in the the unique node table
 }
-
-// ************************************************************
 
 // Hash value modifiers for replace/compose
 const cacheid_REPLACE int = 0x0
@@ -37,8 +34,6 @@ const cacheid_APPEX int = 0x3
 // const cacheid_UNIQUE int = 0x2
 // const cacheid_APPAL int = 0x4
 // const cacheid_APPUN int = 0x5
-
-// ************************************************************
 
 type data4n struct {
 	res int
@@ -75,8 +70,6 @@ func (bc *data4ncache) reset() {
 	}
 }
 
-// *************************************************************************
-
 // cache3n is used for caching replace operations
 type data3ncache struct {
 	ratio  int
@@ -112,13 +105,12 @@ func (bc *data3ncache) reset() {
 	}
 }
 
-// *************************************************************************
 // Setup and shutdown
 
-func (b *buddy) cacheinit(size, ratio int) {
+func (b *caches) cacheinit(size, ratio int) {
 	b.quantset = make([]int32, 0)
 	if size <= 0 {
-		size = len(b.nodes)/4 + 1
+		size = 10000
 	}
 	size = bdd_prime_gte(size)
 	b.applycache = applycache{}
@@ -133,7 +125,7 @@ func (b *buddy) cacheinit(size, ratio int) {
 	b.replacecache.init(size, ratio)
 }
 
-func (b *buddy) cachereset() {
+func (b *caches) cachereset() {
 	b.applycache.reset()
 	b.itecache.reset()
 	b.quantcache.reset()
@@ -141,15 +133,14 @@ func (b *buddy) cachereset() {
 	b.replacecache.reset()
 }
 
-func (b *buddy) cacheresize() {
-	b.applycache.resize(len(b.nodes))
-	b.itecache.resize(len(b.nodes))
-	b.quantcache.resize(len(b.nodes))
-	b.appexcache.resize(len(b.nodes))
-	b.replacecache.resize(len(b.nodes))
+func (b *caches) cacheresize(nodesize int) {
+	b.applycache.resize(nodesize)
+	b.itecache.resize(nodesize)
+	b.quantcache.resize(nodesize)
+	b.appexcache.resize(nodesize)
+	b.replacecache.resize(nodesize)
 }
 
-// ************************************************************
 //
 // Quantification Cache
 //
@@ -173,7 +164,22 @@ func (b *buddy) quantset2cache(n int) error {
 	return nil
 }
 
-// ************************************************************
+func (b *hudd) quantset2cache(n int) error {
+	if n < 2 {
+		b.seterror("Illegal variable (%d) in varset to cache", n)
+		return b.error
+	}
+	b.quantsetID++
+	if b.quantsetID == math.MaxInt32 {
+		b.quantset = make([]int32, b.varnum)
+		b.quantsetID = 1
+	}
+	for i := n; i > 1; i = b.nodes[i].high {
+		b.quantset[b.nodes[i].level] = b.quantsetID
+		b.quantlast = b.nodes[i].level
+	}
+	return nil
+}
 
 //
 // Prints information about the cache performance. The information contains the
@@ -189,7 +195,6 @@ func (c cacheStat) String() string {
 	return res
 }
 
-// *************************************************************************
 // The hash function for Apply is #(left, right, applycache.op).
 
 type applycache struct {
@@ -253,7 +258,6 @@ func (bc applycache) String() string {
 	return res
 }
 
-// *************************************************************************
 // The hash function for ITE is #(f,g,h), so we need to cache 4 node positions
 // per entry.
 
@@ -292,7 +296,6 @@ func (bc itecache) String() string {
 	return res
 }
 
-// *************************************************************************
 // The hash function for quantification is (n, varset, quantid).
 
 type quantcache struct {
@@ -334,7 +337,6 @@ func (bc quantcache) String() string {
 	return res
 }
 
-// *************************************************************************
 // The hash function for AppEx is #(left, right, varset << 2 | appexcache.op )
 // so we can use the same cache for several operators.
 
@@ -376,7 +378,6 @@ func (bc appexcache) String() string {
 	return res
 }
 
-// *************************************************************************
 // The hash function for operation Replace(n) is simply n.
 
 type replacecache struct {
@@ -413,5 +414,3 @@ func (bc replacecache) String() string {
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
 }
-
-// *************************************************************************

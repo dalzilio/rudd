@@ -19,8 +19,6 @@ func _PAIR(a, b, len int) int {
 	return int(((((ua + ub) * (ua + ub + 1)) / 2) + (ua)) % uint64(len))
 }
 
-// ************************************************************
-
 // The hash function for nodes is #(level, low, high)
 
 func (b *buddy) ptrhash(n int) int {

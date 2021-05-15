@@ -14,9 +14,14 @@ import (
 // reachable state of a system composed of N cyclers, with an initial BDD size
 // of size. For this system, we have an anlytical formula to compute the size of
 // the state space.
-func milner_system(size, N int, fast bool) (Set, Node, error) {
-	bdd := Buddy(N*6, size, size/4, 4)
+func milner_system(size, N int, fast bool, buddy bool) (Set, Node, error) {
+	var bdd Set
+	if buddy {
+		bdd = Buddy(N*6, size, size/4, 4)
+	} else {
+		bdd = Hudd(N*6, size, size/4, 4)
 
+	}
 	c := make([]Node, N)
 	cp := make([]Node, N)
 	t := make([]Node, N)
@@ -93,13 +98,14 @@ func milner_system(size, N int, fast bool) (Set, Node, error) {
 }
 
 func TestMilnerSlow(t *testing.T) {
+	buddy := false
 	for _, N := range []int{4, 5, 7, 11} {
 		// we choose a small size to stress test garbage collection
-		fast, Rfast, err := milner_system(100, N, true)
+		fast, Rfast, err := milner_system(100, N, true, buddy)
 		if err != nil {
 			t.Error(err)
 		}
-		slow, Rslow, err := milner_system(100, N, false)
+		slow, Rslow, err := milner_system(100, N, false, buddy)
 		if err != nil {
 			t.Error(err)
 		}
@@ -116,9 +122,10 @@ func TestMilnerSlow(t *testing.T) {
 }
 
 func TestMilner(t *testing.T) {
+	buddy := false
 	for _, N := range []int{16, 20, 30, 50} {
 		// we choose a small size to stress test garbage collection
-		bdd, R, err := milner_system(100000, N, true)
+		bdd, R, err := milner_system(100000, N, true, buddy)
 		if err != nil {
 			t.Error(err)
 		}
@@ -135,7 +142,7 @@ func TestMilner(t *testing.T) {
 
 func TestMilner80(t *testing.T) {
 	N := 80
-	bdd, R, err := milner_system(500000, N, true)
+	bdd, R, err := milner_system(500000, N, true, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -149,10 +156,19 @@ func TestMilner80(t *testing.T) {
 	}
 }
 
-func BenchmarkMilner(b *testing.B) {
+func BenchmarkMilnerBuddy(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner_system(500000, 49, true); err != nil {
+		if _, _, err := milner_system(500000, 49, true, true); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkMilnerHudd(b *testing.B) {
+	// run the milner_system function b.N times
+	for n := 0; n < b.N; n++ {
+		if _, _, err := milner_system(500000, 49, true, false); err != nil {
 			b.Error(err)
 		}
 	}

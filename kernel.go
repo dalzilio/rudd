@@ -60,8 +60,6 @@ const _MAXREFCOUNT int32 = 0x3FF
 // number of nodes during a resize.
 const _DEFAULTMAXNODEINC int = 500000
 
-// *************************************************************************
-
 func (b *buddy) makenode(level int32, low, high int) int {
 	if _DEBUG {
 		b.cacheStat.uniqueAccess++
@@ -124,8 +122,6 @@ func (b *buddy) makenode(level int32, low, high int) int {
 	return res
 }
 
-// *************************************************************************
-
 func (b *buddy) noderesize() error {
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
@@ -160,7 +156,7 @@ func (b *buddy) noderesize() error {
 	// FIXME: we could replace realloc with making a bigger slice and copying
 	// values.
 	tmp := b.nodes
-	b.nodes = make([]buddyNode, nodesize)
+	b.nodes = make([]buddynode, nodesize)
 	copy(b.nodes, tmp)
 	tmp = nil
 
@@ -193,7 +189,7 @@ func (b *buddy) noderesize() error {
 		}
 	}
 
-	b.cacheresize()
+	b.cacheresize(len(b.nodes))
 
 	if _LOGLEVEL > 0 {
 		log.Printf("end resize: %d\n", len(b.nodes))
@@ -202,7 +198,104 @@ func (b *buddy) noderesize() error {
 	return nil
 }
 
-// *************************************************************************
+// gbc is the garbage collector called for reclaiming memory, inside a call to
+// makenode, when there are no free positions available. Allocated nodes that
+// are not reclaimed do not move.
+func (b *buddy) gbc() {
+	if _LOGLEVEL > 0 {
+		log.Println("starting GC")
+		if _LOGLEVEL > 2 {
+			b.logTable()
+		}
+	}
+
+	if b.error != nil {
+		return
+	}
+
+	// We could  explictly ask the system to run its GC so that we can decrement
+	// the ref counts of Nodes that had an external reference. This is blocking.
+	// Frequent GC is time consuming, but with fewer GC we can experience more
+	// resizing events.
+	//
+	// runtime.GC()
+
+	// we append the current stats to the GC history
+	if _DEBUG {
+		b.gcstat.history = append(b.gcstat.history, gcpoint{
+			nodes:            len(b.nodes),
+			freenodes:        b.freenum,
+			setfinalizers:    int(b.gcstat.setfinalizers),
+			calledfinalizers: int(b.gcstat.calledfinalizers),
+		})
+		b.gcstat.setfinalizers = 0
+		b.gcstat.calledfinalizers = 0
+		if _LOGLEVEL > 0 {
+			log.Printf("runtime.GC() reclaimed %d references\n", b.gcstat.calledfinalizers)
+		}
+	} else {
+		b.gcstat.history = append(b.gcstat.history, gcpoint{
+			nodes:     len(b.nodes),
+			freenodes: b.freenum,
+		})
+	}
+	// we mark the nodes in the refstack to avoid collecting them
+	for _, r := range b.refstack {
+		b.markrec(int(r))
+	}
+	// we also protect nodes with a positive refcount (and therefore also the
+	// ones with a MAXREFCOUNT, such has variables)
+	for k := range b.nodes {
+		if b.nodes[k].refcou > 0 {
+			b.markrec(k)
+		}
+		b.nodes[k].hash = 0
+	}
+	b.freepos = 0
+	b.freenum = 0
+	// we do a pass through the nodes list to update the hash chains and void
+	// the unmarked nodes. After finishing this pass, b.freepos points to the
+	// first free position in b.nodes, or it is 0 if we found none.
+	for n := len(b.nodes) - 1; n > 1; n-- {
+		if b.ismarked(n) && (b.nodes[n].low != -1) {
+			b.unmarknode(n)
+			hash := b.ptrhash(int(n))
+			b.nodes[n].next = b.nodes[hash].hash
+			b.nodes[hash].hash = int(n)
+		} else {
+			b.nodes[n].low = -1
+			b.nodes[n].next = b.freepos
+			b.freepos = n
+			b.freenum++
+		}
+	}
+	// we also invalidate the caches
+	b.cachereset()
+	if _LOGLEVEL > 0 {
+		log.Printf("end GC; freenum: %d\n", b.freenum)
+		if _LOGLEVEL > 2 {
+			b.logTable()
+		}
+	}
+}
+
+func (b *buddy) markrec(n int) {
+	if n < 2 || b.ismarked(n) || (b.nodes[n].low == -1) {
+		return
+	}
+	b.marknode(n)
+	b.markrec(b.nodes[n].low)
+	b.markrec(b.nodes[n].high)
+}
+
+func (b *buddy) unmarkall() {
+	for k, v := range b.nodes {
+		if k < 2 || !b.ismarked(k) || (v.low == -1) {
+			continue
+		}
+		b.unmarknode(k)
+	}
+}
 
 // Scanset returns the set of variables (levels) found when following the high
 // branch of node n. This is the dual of function Makeset. The result may be nil

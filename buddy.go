@@ -5,32 +5,24 @@
 package rudd
 
 import (
+	"fmt"
 	"log"
 	"sync/atomic"
+	"unsafe"
 )
 
 // buddy implements a Binary Decision Diagram using the data structures and
 // algorithms found in the BuDDy library.
 type buddy struct {
 	bdd
-	nodes           []buddyNode // List of all the BDD nodes. Constants are always kept at index 0 and 1
-	freenum         int         // Number of free nodes
-	freepos         int         // First free node
-	nodefinalizer   interface{} // Finalizer used to decrement the ref count of external references
-	maxnodesize     int         // Maximum total number of nodes (0 if no limit)
-	maxnodeincrease int         // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
-	minfreenodes    int         // Minimum number of nodes that should be left after GC before triggering a resize
-	cacheStat                   // Information about the caches
-	applycache                  // Cache for apply results
-	itecache                    // Cache for ITE results
-	quantcache                  // Cache for exist/forall results
-	appexcache                  // Cache for AppEx results
-	replacecache                // Cache for Replace results
+	nodes         []buddynode // List of all the BDD nodes. Constants are always kept at index 0 and 1
+	freenum       int         // Number of free nodes
+	freepos       int         // First free node
+	nodefinalizer interface{} // Finalizer used to decrement the ref count of external references
+	cacheStat                 // Information about the caches
 }
 
-// ************************************************************
-
-type buddyNode struct {
+type buddynode struct {
 	refcou int32 // Count the number of external references
 	level  int32 // Order of the variable in the BDD
 	low    int   // Reference to the false branch
@@ -38,8 +30,6 @@ type buddyNode struct {
 	hash   int   // Index where to (possibly) find node with this hash value
 	next   int   // Next index to check in case of a collision, 0 if last
 }
-
-// ************************************************************
 
 func (b *buddy) ismarked(n int) bool {
 	return (b.nodes[n].level & 0x200000) != 0
@@ -52,8 +42,6 @@ func (b *buddy) marknode(n int) {
 func (b *buddy) unmarknode(n int) {
 	b.nodes[n].level = b.nodes[n].level & 0x1FFFFF
 }
-
-// ************************************************************
 
 // Buddy initializes a new BDD implementing the algorithms in the BuDDy library,
 // wher varnum is the number of variables in the BDD, and nodesize is the size
@@ -82,9 +70,9 @@ func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
 	b.minfreenodes = _MINFREENODES
 	b.maxnodeincrease = _DEFAULTMAXNODEINC
 	// initializing the list of nodes
-	b.nodes = make([]buddyNode, nodesize)
+	b.nodes = make([]buddynode, nodesize)
 	for k := range b.nodes {
-		b.nodes[k] = buddyNode{
+		b.nodes[k] = buddynode{
 			refcou: 0,
 			level:  0,
 			low:    -1,
@@ -127,8 +115,6 @@ func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
 	}
 	return Set{b}
 }
-
-// ************************************************************
 
 // setVarnum sets the number of BDD variables. We call this function only once
 // during initialization and generate the list used for Ithvar and NIthvar.
@@ -178,8 +164,6 @@ func (b *buddy) setVarnum(num int) error {
 	return nil
 }
 
-// ************************************************************
-
 // Ithvar returns a BDD representing the i'th variable on success, otherwise we
 // set the error status in the BDD and returns the constant False. The requested
 // variable must be in the range [0..Varnum).
@@ -200,11 +184,6 @@ func (b *buddy) NIthvar(i int) Node {
 	}
 	// we do not need to reference count variables
 	return inode(b.varset[i][1])
-}
-
-// Varnum returns the number of defined variables.
-func (b *buddy) Varnum() int {
-	return int(b.varnum)
 }
 
 // Label returns the variable (index) corresponding to node n in the BDD. We set
@@ -237,4 +216,27 @@ func (b *buddy) High(n Node) Node {
 		return b.seterror("Illegal access to node %d in call to High", n)
 	}
 	return b.retnode(b.nodes[*n].high)
+}
+
+// Stats returns information about the BDD
+func (b *buddy) Stats() string {
+	res := "==============\n"
+	res += fmt.Sprintf("Varnum:     %d\n", b.varnum)
+	res += fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
+	res += fmt.Sprintf("Produced:   %d\n", b.produced)
+	r := (float64(b.freenum) / float64(len(b.nodes))) * 100
+	res += fmt.Sprintf("Free:       %d  (%.3g %%)\n", b.freenum, r)
+	res += fmt.Sprintf("Used:       %d  (%.3g %%)\n", len(b.nodes)-b.freenum, (100.0 - r))
+	res += fmt.Sprintf("Size:       %s\n", humanSize(len(b.nodes), unsafe.Sizeof(buddynode{})))
+	res += b.gcstats()
+	if _DEBUG {
+		res += "==============\n"
+		res += b.cacheStat.String()
+		res += b.applycache.String()
+		res += b.itecache.String()
+		res += b.quantcache.String()
+		res += b.appexcache.String()
+		res += b.replacecache.String()
+	}
+	return res
 }

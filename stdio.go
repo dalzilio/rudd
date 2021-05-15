@@ -11,33 +11,9 @@ import (
 	"os"
 	"sort"
 	"text/tabwriter"
-	"unsafe"
 )
 
-// Stats returns information about the BDD
-func (b *buddy) Stats() string {
-	res := "==============\n"
-	res += fmt.Sprintf("Varnum:     %d\n", b.varnum)
-	res += fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
-	res += fmt.Sprintf("Produced:   %d\n", b.produced)
-	r := (float64(b.freenum) / float64(len(b.nodes))) * 100
-	res += fmt.Sprintf("Free:       %d  (%.3g %%)\n", b.freenum, r)
-	res += fmt.Sprintf("Used:       %d  (%.3g %%)\n", len(b.nodes)-b.freenum, (100.0 - r))
-	res += fmt.Sprintf("Size:       %s\n", humanSize(len(b.nodes), unsafe.Sizeof(buddyNode{})))
-	res += b.gcstats()
-	if _DEBUG {
-		res += "==============\n"
-		res += b.cacheStat.String()
-		res += b.applycache.String()
-		res += b.itecache.String()
-		res += b.quantcache.String()
-		res += b.appexcache.String()
-		res += b.replacecache.String()
-	}
-	return res
-}
-
-func (b *buddy) gcstats() string {
+func (b *bdd) gcstats() string {
 	res := fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history))
 	if _DEBUG {
 		allocated := int(b.gcstat.setfinalizers)
@@ -76,8 +52,6 @@ func humanSize(b int, unit uintptr) string {
 		}
 	}
 }
-
-// ******************************************************************************************************
 
 // PrintSet outputs a textual representation of the BDD with root n to the
 // standard output. We print all the nodes in b if n is nil.
@@ -127,8 +101,6 @@ func print_set(w io.Writer, nodes [][4]int) {
 	}
 	tw.Flush()
 }
-
-// ******************************************************************************************************
 
 // PrintDot prints a graph-like description of the BDD with roots in n using the
 // DOT format; or the whole Set if n is missing.

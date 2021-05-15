@@ -35,13 +35,16 @@ func TestMinus(t *testing.T) {
 //********************************************************************************************
 
 func TestIte_1(t *testing.T) {
-	bdd := Buddy(4, 5000, 50)
-	n1 := bdd.Makeset([]int{0, 2, 3})
-	n2 := bdd.Makeset([]int{0, 3})
-	actual := bdd.Equiv(bdd.Ite(n1, n2, bdd.Not(n2)), bdd.Or(bdd.And(n1, n2), bdd.And(bdd.Not(n1), bdd.Not(n2))))
-	if actual != bdd.True() {
-		t.Errorf("ite(f,g,h) <=> (f or g) and (-f or h): expected true, actual false")
+	tt := func(implem string, bdd Set) {
+		n1 := bdd.Makeset([]int{0, 2, 3})
+		n2 := bdd.Makeset([]int{0, 3})
+		actual := bdd.Equiv(bdd.Ite(n1, n2, bdd.Not(n2)), bdd.Or(bdd.And(n1, n2), bdd.And(bdd.Not(n1), bdd.Not(n2))))
+		if actual != bdd.True() {
+			t.Errorf("%s: ite(f,g,h) <=> (f or g) and (-f or h): expected true, actual false", implem)
+		}
 	}
+	tt("Buddy", Buddy(4, 5000, 50))
+	tt("Hudd", Hudd(4, 5000, 50))
 }
 
 //********************************************************************************************
@@ -49,93 +52,95 @@ func TestIte_1(t *testing.T) {
 // TestOperations implements the same tests than the bddtest program in the
 // Buddy distribution. It uses function Allsat for checking that all assignments
 // are detected.
-
 func TestOperations(t *testing.T) {
 	varnum := 4
-	bdd := Buddy(varnum, 1000, 1000)
 
-	test1_check := func(x Node) error {
-		allsatBDD := x
-		allsatSumBDD := bdd.False()
-		// Calculate whole set of asignments and remove all assignments
-		// from original set
-		bdd.Allsat(x, func(varset []int) error {
-			x := bdd.True()
-			for k, v := range varset {
-				switch v {
-				case 0:
-					x = bdd.And(x, bdd.NIthvar(k))
-				case 1:
-					x = bdd.And(x, bdd.Ithvar(k))
+	tt := func(implem string, bdd Set) {
+		test1_check := func(x Node) error {
+			allsatBDD := x
+			allsatSumBDD := bdd.False()
+			// Calculate whole set of asignments and remove all assignments
+			// from original set
+			bdd.Allsat(x, func(varset []int) error {
+				x := bdd.True()
+				for k, v := range varset {
+					switch v {
+					case 0:
+						x = bdd.And(x, bdd.NIthvar(k))
+					case 1:
+						x = bdd.And(x, bdd.Ithvar(k))
+					}
+				}
+				t.Logf("Checking bdd with %-4s assignments\n", bdd.Satcount(x))
+				// Sum up all assignments
+				allsatSumBDD = bdd.Or(allsatSumBDD, x)
+				// Remove assignment from initial set
+				allsatBDD = bdd.Apply(allsatBDD, x, OPdiff)
+				return nil
+			})
+
+			// Now the summed set should be equal to the original set and the
+			// subtracted set should be empty
+			if !bdd.Equal(allsatSumBDD, x) {
+				return fmt.Errorf("AllSat sum is not the initial BDD")
+			}
+
+			if !bdd.Equal(allsatBDD, bdd.False()) {
+				return fmt.Errorf("AllSat is not False")
+			}
+			return nil
+		}
+
+		a := bdd.Ithvar(0)
+		b := bdd.Ithvar(1)
+		c := bdd.Ithvar(2)
+		d := bdd.Ithvar(3)
+		na := bdd.NIthvar(0)
+		nb := bdd.NIthvar(1)
+		nc := bdd.NIthvar(2)
+		nd := bdd.NIthvar(3)
+
+		test1_check(bdd.True())
+
+		test1_check(bdd.False())
+
+		// a & b | !a & !b
+		test1_check(bdd.Or(bdd.And(a, b), bdd.And(na, nb)))
+
+		// a & b | c & d
+		test1_check(bdd.Or(bdd.And(a, b), bdd.And(c, d)))
+
+		// a & !b | a & !d | a & b & !c
+		test1_check(bdd.Or(bdd.And(a, nb), bdd.And(a, nd), bdd.And(a, b, nc)))
+
+		for i := 0; i < varnum; i++ {
+			test1_check(bdd.Ithvar(i))
+			test1_check(bdd.NIthvar(i))
+		}
+
+		set := bdd.True()
+		for i := 0; i < 50; i++ {
+			v := rand.Intn(varnum)
+			s := rand.Intn(2)
+			o := rand.Intn(2)
+
+			if o == 0 {
+				if s == 0 {
+					set = bdd.And(set, bdd.Ithvar(v))
+				} else {
+					set = bdd.And(set, bdd.NIthvar(v))
+				}
+			} else {
+				if s == 0 {
+					set = bdd.And(set, bdd.Ithvar(v))
+				} else {
+					set = bdd.And(set, bdd.NIthvar(v))
 				}
 			}
-			t.Logf("Checking bdd with %-4s assignments\n", bdd.Satcount(x))
-			// Sum up all assignments
-			allsatSumBDD = bdd.Or(allsatSumBDD, x)
-			// Remove assignment from initial set
-			allsatBDD = bdd.Apply(allsatBDD, x, OPdiff)
-			return nil
-		})
 
-		// Now the summed set should be equal to the original set and the
-		// subtracted set should be empty
-		if !bdd.Equal(allsatSumBDD, x) {
-			return fmt.Errorf("AllSat sum is not the initial BDD")
+			test1_check(set)
 		}
-
-		if !bdd.Equal(allsatBDD, bdd.False()) {
-			return fmt.Errorf("AllSat is not False")
-		}
-		return nil
 	}
-
-	a := bdd.Ithvar(0)
-	b := bdd.Ithvar(1)
-	c := bdd.Ithvar(2)
-	d := bdd.Ithvar(3)
-	na := bdd.NIthvar(0)
-	nb := bdd.NIthvar(1)
-	nc := bdd.NIthvar(2)
-	nd := bdd.NIthvar(3)
-
-	test1_check(bdd.True())
-
-	test1_check(bdd.False())
-
-	// a & b | !a & !b
-	test1_check(bdd.Or(bdd.And(a, b), bdd.And(na, nb)))
-
-	// a & b | c & d
-	test1_check(bdd.Or(bdd.And(a, b), bdd.And(c, d)))
-
-	// a & !b | a & !d | a & b & !c
-	test1_check(bdd.Or(bdd.And(a, nb), bdd.And(a, nd), bdd.And(a, b, nc)))
-
-	for i := 0; i < varnum; i++ {
-		test1_check(bdd.Ithvar(i))
-		test1_check(bdd.NIthvar(i))
-	}
-
-	set := bdd.True()
-	for i := 0; i < 50; i++ {
-		v := rand.Intn(varnum)
-		s := rand.Intn(2)
-		o := rand.Intn(2)
-
-		if o == 0 {
-			if s == 0 {
-				set = bdd.And(set, bdd.Ithvar(v))
-			} else {
-				set = bdd.And(set, bdd.NIthvar(v))
-			}
-		} else {
-			if s == 0 {
-				set = bdd.And(set, bdd.Ithvar(v))
-			} else {
-				set = bdd.And(set, bdd.NIthvar(v))
-			}
-		}
-
-		test1_check(set)
-	}
+	tt("Buddy", Buddy(varnum, 1000, 1000))
+	tt("Hudd", Hudd(varnum, 1000, 1000))
 }

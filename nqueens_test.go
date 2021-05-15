@@ -25,66 +25,69 @@ import (
 //      . . . X
 //      X . . .
 //      . . X .
-func nqueens_system(N int) *big.Int {
-	bdd := Buddy(N*N, N*N*256, 10000)
-	queen := bdd.True()
-	X := make([][]Node, N)
-	for i := range X {
-		X[i] = make([]Node, N)
-		for j := range X[i] {
-			X[i][j] = bdd.Ithvar(i*N + j)
+func nqueens_system(N int) (*big.Int, *big.Int) {
+	tt := func(implem string, bdd Set) *big.Int {
+		queen := bdd.True()
+		X := make([][]Node, N)
+		for i := range X {
+			X[i] = make([]Node, N)
+			for j := range X[i] {
+				X[i][j] = bdd.Ithvar(i*N + j)
+			}
 		}
-	}
-	// Place a queen in each row
-	for i := 0; i < N; i++ {
-		e := bdd.False()
-		for j := 0; j < N; j++ {
-			e = bdd.Or(e, X[i][j])
+		// Place a queen in each row
+		for i := 0; i < N; i++ {
+			e := bdd.False()
+			for j := 0; j < N; j++ {
+				e = bdd.Or(e, X[i][j])
+			}
+			queen = bdd.And(queen, e)
 		}
-		queen = bdd.And(queen, e)
+
+		// Build requirements for each variable(field)
+		for i := 0; i < N; i++ {
+			for j := 0; j < N; j++ {
+				// No one in the same column
+				a := bdd.True()
+				for k := 0; k < N; k++ {
+					if k != j {
+						a = bdd.And(a, bdd.Imp(X[i][j], bdd.Not(X[i][k])))
+					}
+				}
+				// No one in the same row
+				b := bdd.True()
+				for k := 0; k < N; k++ {
+					if k != i {
+						b = bdd.And(b, bdd.Imp(X[i][j], bdd.Not(X[k][j])))
+					}
+				}
+				// No one in the same up-right diagonal
+				c := bdd.True()
+				for k := 0; k < N; k++ {
+					ll := k - i + j
+					if ll >= 0 && ll < N {
+						if k != i {
+							c = bdd.And(c, bdd.Imp(X[i][j], bdd.Not(X[k][ll])))
+						}
+					}
+				}
+				// No one in the same down-right diagonal
+				d := bdd.True()
+				for k := 0; k < N; k++ {
+					ll := i + j - k
+					if ll >= 0 && ll < N {
+						if k != i {
+							d = bdd.And(d, bdd.Imp(X[i][j], bdd.Not(X[k][ll])))
+						}
+					}
+				}
+				queen = bdd.And(queen, a, b, c, d)
+			}
+		}
+		return bdd.Satcount(queen)
 	}
 
-	// Build requirements for each variable(field)
-	for i := 0; i < N; i++ {
-		for j := 0; j < N; j++ {
-			// No one in the same column
-			a := bdd.True()
-			for k := 0; k < N; k++ {
-				if k != j {
-					a = bdd.And(a, bdd.Imp(X[i][j], bdd.Not(X[i][k])))
-				}
-			}
-			// No one in the same row
-			b := bdd.True()
-			for k := 0; k < N; k++ {
-				if k != i {
-					b = bdd.And(b, bdd.Imp(X[i][j], bdd.Not(X[k][j])))
-				}
-			}
-			// No one in the same up-right diagonal
-			c := bdd.True()
-			for k := 0; k < N; k++ {
-				ll := k - i + j
-				if ll >= 0 && ll < N {
-					if k != i {
-						c = bdd.And(c, bdd.Imp(X[i][j], bdd.Not(X[k][ll])))
-					}
-				}
-			}
-			// No one in the same down-right diagonal
-			d := bdd.True()
-			for k := 0; k < N; k++ {
-				ll := i + j - k
-				if ll >= 0 && ll < N {
-					if k != i {
-						d = bdd.And(d, bdd.Imp(X[i][j], bdd.Not(X[k][ll])))
-					}
-				}
-			}
-			queen = bdd.And(queen, a, b, c, d)
-		}
-	}
-	return bdd.Satcount(queen)
+	return tt("Buddy", Buddy(N*N, N*N*256, 10000)), tt("Hudd", Hudd(N*N, N*N*256, 10000))
 }
 
 func TestNQueens(t *testing.T) {
@@ -98,9 +101,12 @@ func TestNQueens(t *testing.T) {
 		{10, 724},
 	}
 	for _, tt := range nqueensTests {
-		actual := nqueens_system(tt.N)
-		if actual.Cmp(big.NewInt(tt.expected)) != 0 {
-			t.Errorf("Error in NQuens(%d), expected %d, actual %s", tt.N, tt.expected, actual)
+		actualb, actualh := nqueens_system(tt.N)
+		if actualb.Cmp(big.NewInt(tt.expected)) != 0 {
+			t.Errorf("Buddy: Error in NQuens(%d), expected %d, actual %s", tt.N, tt.expected, actualb)
+		}
+		if actualh.Cmp(big.NewInt(tt.expected)) != 0 {
+			t.Errorf("Hudd: Error in NQuens(%d), expected %d, actual %s", tt.N, tt.expected, actualh)
 		}
 	}
 }
