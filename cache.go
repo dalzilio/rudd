@@ -296,8 +296,11 @@ func (bc itecache) String() string {
 // The hash function for quantification is (n, varset, quantid).
 
 type quantcache struct {
-	data4ncache     // Cache for exist/forall results
-	id          int // Current cache id for quantifications
+	data4ncache         // Cache for exist/forall results
+	quantset    []int32 // Current variable set for quant.
+	quantsetID  int32   // Current id used in quantset
+	quantlast   int32   // Current last variable to be quant.
+	id          int     // Current cache id for quantifications
 }
 
 func (bc *quantcache) matchquant(n, varset int) int {

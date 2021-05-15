@@ -120,6 +120,30 @@ type Node *int
 
 // ************************************************************
 
+// bdd is the structure shared by all implementations of BDD where we use
+// integer as the key for Nodes.
+type bdd struct {
+	varnum   int32    // number of BDD variables
+	varset   [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
+	refstack []int    // Internal node reference stack
+	produced int      // Total number of new nodes ever produced
+	gcstat            // Information about garbage collections
+	error             // Error status to help chain operations
+}
+
+// inode returns a Node for known nodes, such as variables, that do not need to
+// increase their reference count.
+func inode(n int) Node {
+	x := n
+	return &x
+}
+
+var bddone Node = inode(1)
+
+var bddzero Node = inode(0)
+
+// ************************************************************
+
 // And returns the logical 'and' of a sequence of nodes.
 func (b Set) And(n ...Node) Node {
 	if len(n) == 1 {

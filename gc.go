@@ -223,15 +223,15 @@ func (b *buddy) unmarkall() {
 // currently being built (e.g. transient nodes built during an apply) to be
 // reclaimed during GC.
 
-func (b *buddy) initref() {
+func (b *bdd) initref() {
 	b.refstack = b.refstack[:0]
 }
 
-func (b *buddy) pushref(n int) int {
+func (b *bdd) pushref(n int) int {
 	b.refstack = append(b.refstack, n)
 	return n
 }
 
-func (b *buddy) popref(a int) {
+func (b *bdd) popref(a int) {
 	b.refstack = b.refstack[:len(b.refstack)-a]
 }

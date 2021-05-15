@@ -9,16 +9,6 @@ import (
 	"sync/atomic"
 )
 
-// bdd is the structure shared by all implementations of BDD where we use
-// integer as the key for Nodes.
-type bdd struct {
-	varnum   int32    // number of BDD variables
-	varset   [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
-	refstack []int    // Internal node reference stack
-	produced int      // Total number of new nodes ever produced
-	error             // Error status to help chain operations
-}
-
 // buddy implements a Binary Decision Diagram using the data structures and
 // algorithms found in the BuDDy library.
 type buddy struct {
@@ -30,16 +20,37 @@ type buddy struct {
 	maxnodesize     int         // Maximum total number of nodes (0 if no limit)
 	maxnodeincrease int         // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
 	minfreenodes    int         // Minimum number of nodes that should be left after GC before triggering a resize
-	quantset        []int32     // Current variable set for quant.
-	quantsetID      int32       // Current id used in quantset
-	quantlast       int32       // Current last variable to be quant.
-	gcstat                      // Information about garbage collections
 	cacheStat                   // Information about the caches
 	applycache                  // Cache for apply results
 	itecache                    // Cache for ITE results
 	quantcache                  // Cache for exist/forall results
 	appexcache                  // Cache for AppEx results
 	replacecache                // Cache for Replace results
+}
+
+// ************************************************************
+
+type buddyNode struct {
+	refcou int32 // Count the number of external references
+	level  int32 // Order of the variable in the BDD
+	low    int   // Reference to the false branch
+	high   int   // Reference to the true branch
+	hash   int   // Index where to (possibly) find node with this hash value
+	next   int   // Next index to check in case of a collision, 0 if last
+}
+
+// ************************************************************
+
+func (b *buddy) ismarked(n int) bool {
+	return (b.nodes[n].level & 0x200000) != 0
+}
+
+func (b *buddy) marknode(n int) {
+	b.nodes[n].level = b.nodes[n].level | 0x200000
+}
+
+func (b *buddy) unmarknode(n int) {
+	b.nodes[n].level = b.nodes[n].level & 0x1FFFFF
 }
 
 // ************************************************************
