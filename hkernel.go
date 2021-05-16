@@ -63,18 +63,18 @@ func (b *hudd) makenode(level int32, low int, high int, refstack []int) (int, er
 	if b.freepos == 0 {
 		// We garbage collect unused nodes to try and find spare space.
 		b.gbc(refstack)
-		err = ErrReset
+		err = errReset
 		// We also test if we are under the threshold for resising.
 		if (b.freenum*100)/len(b.nodes) <= b.minfreenodes {
 			err = b.noderesize()
-			if err != ErrResize {
-				return -1, ErrMemory
+			if err != errResize {
+				return -1, errMemory
 			}
 		}
 		// Panic if we still have no free positions after all this
 		if b.freepos == 0 {
 			// b.seterror("Unable to resize BDD")
-			return -1, ErrMemory
+			return -1, errMemory
 		}
 	}
 	// We can now build the new node in the first available spot
@@ -154,7 +154,7 @@ func (b *hudd) noderesize() error {
 	nodesize := len(b.nodes)
 	if (oldsize >= b.maxnodesize) && (b.maxnodesize > 0) {
 		// b.seterror("Cannot resize BDD, already at max capacity (%d nodes)", b.maxnodesize)
-		return ErrMemory
+		return errMemory
 	}
 	if oldsize > (math.MaxInt32 >> 1) {
 		nodesize = math.MaxInt32 - 1
@@ -169,7 +169,7 @@ func (b *hudd) noderesize() error {
 	}
 	if nodesize <= oldsize {
 		// b.seterror("Unable to grow size of BDD (%d nodes)", nodesize)
-		return ErrMemory
+		return errMemory
 	}
 
 	tmp := b.nodes
@@ -193,7 +193,7 @@ func (b *hudd) noderesize() error {
 		log.Printf("end resize: %d\n", len(b.nodes))
 	}
 
-	return ErrResize
+	return errResize
 }
 
 func (b *hudd) markrec(n int) {

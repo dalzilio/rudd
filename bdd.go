@@ -161,8 +161,8 @@ type bdd struct {
 	varset         [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
 	refstack       []int    // Internal node reference stack
 	error                   // Error status to help chain operations
-	caches                  // Set of 5 caches used for the operations in the bdd
-	implementation          // Underlying structure that encapsulate the list of nodes
+	caches                  // Set of caches used for the operations in the bdd
+	implementation          // Underlying struct that encapsulates the list of nodes
 }
 
 // Varnum returns the number of defined variables.
@@ -175,11 +175,11 @@ func (b *bdd) makenode(level int32, low, high int) int {
 	if err == nil {
 		return res
 	}
-	if err == ErrReset {
+	if err == errReset {
 		b.cachereset()
 		return res
 	}
-	if err == ErrResize {
+	if err == errResize {
 		b.cacheresize(b.size())
 		return res
 	}
@@ -193,13 +193,6 @@ type caches struct {
 	*quantcache   // Cache for exist/forall results
 	*appexcache   // Cache for AppEx results
 	*replacecache // Cache for Replace results
-}
-
-// configs is used to store the values of different parameters of the BDD
-type configs struct {
-	maxnodesize     int // Maximum total number of nodes (0 if no limit)
-	maxnodeincrease int // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
-	minfreenodes    int // Minimum number of nodes that should be left after GC before triggering a resize
 }
 
 // initref is part of three private functions to manipulate the refstack; used

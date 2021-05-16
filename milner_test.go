@@ -17,9 +17,9 @@ import (
 func milner_system(size, N int, fast bool, buddy bool) (Set, Node, error) {
 	var bdd Set
 	if buddy {
-		bdd = Buddy(N*6, size, size/4, 4)
+		bdd = Buddy(N*6, Nodesize(size), Cachesize(size/4), Cacheratio(25))
 	} else {
-		bdd = Hudd(N*6, size, size/4, 4)
+		bdd = Hudd(N*6, Nodesize(size), Cachesize(size/4), Cacheratio(25))
 
 	}
 	c := make([]Node, N)

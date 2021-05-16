@@ -31,12 +31,12 @@ const _MAXVAR int32 = 0x1FFFFF
 const _MAXREFCOUNT int32 = 0x3FF
 
 // _DEFAULTMAXNODEINC is the default value for the maximal increase in the
-// number of nodes during a resize. It is approx. one million  (1 048 576).
-const _DEFAULTMAXNODEINC int = 1 << 20
+// number of nodes during a resize. It is approx. half a million  (524 288).
+const _DEFAULTMAXNODEINC int = 1 << 19
 
-var ErrMemory = errors.New("unable to free memory or resize BDD")
-var ErrResize = errors.New("should cache resize") // when gbc and then noderesize
-var ErrReset = errors.New("should cache reset")   // when gbc only, without resizing
+var errMemory = errors.New("unable to free memory or resize BDD")
+var errResize = errors.New("should cache resize") // when gbc and then noderesize
+var errReset = errors.New("should cache reset")   // when gbc only, without resizing
 
 // retnode creates a Node for external use and sets a finalizer on it so that we
 // can reclaim the ressource during GC.
@@ -100,19 +100,19 @@ func (b *buddy) makenode(level int32, low, high int, refstack []int) (int, error
 	if b.freepos == 0 {
 		// We garbage collect unused nodes to try and find spare space.
 		b.gbc(refstack)
-		err = ErrReset
+		err = errReset
 		// We also test if we are under the threshold for resising.
 		if (b.freenum*100)/len(b.nodes) <= b.minfreenodes {
 			err = b.noderesize()
-			if err != ErrResize {
-				return -1, ErrMemory
+			if err != errResize {
+				return -1, errMemory
 			}
 			hash = b.nodehash(level, low, high)
 		}
 		// Panic if we still have no free positions after all this
 		if b.freepos == 0 {
 			// b.seterror("Unable to resize BDD")
-			return -1, ErrMemory
+			return -1, errMemory
 		}
 	}
 	// We can now build the new node in the first available spot
@@ -140,7 +140,7 @@ func (b *buddy) noderesize() error {
 	nodesize := len(b.nodes)
 	if (oldsize >= b.maxnodesize) && (b.maxnodesize > 0) {
 		// b.seterror("Cannot resize BDD, already at max capacity (%d nodes)", b.maxnodesize)
-		return ErrMemory
+		return errMemory
 	}
 	if oldsize > (math.MaxInt32 >> 1) {
 		nodesize = math.MaxInt32 - 1
@@ -156,7 +156,7 @@ func (b *buddy) noderesize() error {
 	nodesize = bdd_prime_lte(nodesize)
 	if nodesize <= oldsize {
 		// b.seterror("Unable to grow size of BDD (%d nodes)", nodesize)
-		return ErrMemory
+		return errMemory
 	}
 
 	tmp := b.nodes
@@ -197,7 +197,7 @@ func (b *buddy) noderesize() error {
 		log.Printf("end resize: %d\n", len(b.nodes))
 	}
 	// b.cacheresize(len(b.nodes))
-	return ErrResize
+	return errResize
 }
 
 // gbc is the garbage collector called for reclaiming memory, inside a call to

@@ -48,7 +48,7 @@ func (bc *data4ncache) init(size, ratio int) {
 
 func (bc *data4ncache) resize(size int) {
 	if bc.ratio > 0 {
-		size = bdd_prime_gte(size / bc.ratio)
+		size = bdd_prime_gte((size * bc.ratio) / 100)
 		bc.table = make([]data4n, size)
 	}
 	bc.reset()
@@ -83,7 +83,7 @@ func (bc *data3ncache) init(size, ratio int) {
 
 func (bc *data3ncache) resize(size int) {
 	if bc.ratio > 0 {
-		size = bdd_prime_gte(size / bc.ratio)
+		size = bdd_prime_gte((size * bc.ratio) / 100)
 		bc.table = make([]data3n, size)
 	}
 	bc.reset()
@@ -97,23 +97,24 @@ func (bc *data3ncache) reset() {
 
 // Setup and shutdown
 
-func (b *bdd) cacheinit(size, ratio int) {
-	if size <= 0 {
-		size = 10000
+func (b *bdd) cacheinit(c *configs) {
+	size := 10000
+	if c.cachesize != 0 {
+		size = c.cachesize
 	}
 	size = bdd_prime_gte(size)
 	b.applycache = &applycache{}
-	b.applycache.init(size, ratio)
+	b.applycache.init(size, c.cacheratio)
 	b.itecache = &itecache{}
-	b.itecache.init(size, ratio)
+	b.itecache.init(size, c.cacheratio)
 	b.quantcache = &quantcache{}
-	b.quantcache.init(size, ratio)
+	b.quantcache.init(size, c.cacheratio)
 	b.quantset = make([]int32, b.varnum)
 	b.quantsetID = 0
 	b.appexcache = &appexcache{}
-	b.appexcache.init(size, ratio)
+	b.appexcache.init(size, c.cacheratio)
 	b.replacecache = &replacecache{}
-	b.replacecache.init(size, ratio)
+	b.replacecache.init(size, c.cacheratio)
 }
 
 func (b *bdd) cachereset() {
@@ -212,7 +213,7 @@ func (bc *applycache) setnot(n, res int) int {
 }
 
 func (bc applycache) String() string {
-	res := fmt.Sprintf("== Apply cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
+	res := fmt.Sprintf("== Apply cache  %s\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
 	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
@@ -250,7 +251,7 @@ func (bc *itecache) setite(f, g, h, res int) int {
 }
 
 func (bc itecache) String() string {
-	res := fmt.Sprintf("== ITE cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
+	res := fmt.Sprintf("== ITE cache    %s\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
 	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
@@ -291,7 +292,7 @@ func (bc *quantcache) setquant(n, varset, res int) int {
 }
 
 func (bc quantcache) String() string {
-	res := fmt.Sprintf("== Quant cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
+	res := fmt.Sprintf("== Quant cache  %s\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
 	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
@@ -332,7 +333,7 @@ func (bc *appexcache) setappex(left, right, res int) int {
 }
 
 func (bc appexcache) String() string {
-	res := fmt.Sprintf("== AppEx cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
+	res := fmt.Sprintf("== AppEx cache  %s\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
 	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
@@ -369,7 +370,7 @@ func (bc *replacecache) setreplace(n, res int) int {
 }
 
 func (bc replacecache) String() string {
-	res := fmt.Sprintf("== Replace cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data3n{})))
+	res := fmt.Sprintf("== Replace      %s\n", humanSize(len(bc.table), unsafe.Sizeof(data3n{})))
 	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res

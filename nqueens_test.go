@@ -87,7 +87,8 @@ func nqueens_system(N int) (*big.Int, *big.Int) {
 		return bdd.Satcount(queen)
 	}
 
-	return tt("Buddy", Buddy(N*N, N*N*256, 10000)), tt("Hudd", Hudd(N*N, N*N*256, 10000))
+	return tt("Buddy", Buddy(N*N, Nodesize(N*N*256), Cachesize(10000))),
+		tt("Hudd", Hudd(N*N, Nodesize(N*N*256), Cachesize(10000)))
 }
 
 func TestNQueens(t *testing.T) {

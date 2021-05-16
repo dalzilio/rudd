@@ -43,8 +43,8 @@ func TestIte_1(t *testing.T) {
 			t.Errorf("%s: ite(f,g,h) <=> (f or g) and (-f or h): expected true, actual false", implem)
 		}
 	}
-	tt("Buddy", Buddy(4, 5000, 50))
-	tt("Hudd", Hudd(4, 5000, 50))
+	tt("Buddy", Buddy(4, Nodesize(5000), Cachesize(1000)))
+	tt("Hudd", Hudd(4, Nodesize(5000), Cachesize(1000)))
 }
 
 //********************************************************************************************
@@ -141,6 +141,6 @@ func TestOperations(t *testing.T) {
 			test1_check(set)
 		}
 	}
-	tt("Buddy", Buddy(varnum, 1000, 1000))
-	tt("Hudd", Hudd(varnum, 1000, 1000))
+	tt("Buddy", Buddy(varnum, Nodesize(1000), Cachesize(1000)))
+	tt("Hudd", Hudd(varnum, Nodesize(1000), Cachesize(1000)))
 }

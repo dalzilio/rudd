@@ -49,63 +49,39 @@ func (b *buddy) unmarknode(n int) {
 }
 
 // Buddy initializes a new BDD implementing the algorithms in the BuDDy library,
-// wher varnum is the number of variables in the BDD, and nodesize is the size
-// of the initial node table. Typical values for nodesize are 10 000 nodes for
-// small test examples and up to 1 000 000 nodes for large examples.
-//
-// You can specify optional (int) parameters. Values after the first two
-// optional parameters will not be taken into account. The first value is to
-// specify a cachesize for the internal caches. (A cache size of 10 000 seems to
-// work good even for large examples, but lesser values should do it for smaller
-// examples.) A second extra value is used to set a "cache ratio" so that caches
-// can grow each time we resize the node table. With a cache ratio of r, there
-// is one available slot in the cache for every r slots in the node table. (A
-// typical value for the cache ratio is 4 or 5).  A cache ratio of 0 (the
-// default) means that the cache size is fixed.
+// where varnum is the number of variables in the BDD. You can specify optional
+// (conifguration) parameters, such as the size of the initial node table
+// (Nodesize) or the size for caches (Cachesize).
 //
 // The initial number of nodes is not critical since the table will be resized
 // whenever there are too few nodes left after a garbage collection. But it does
 // have some impact on the efficency of the operations.
-func Buddy(varnum int, nodesize int, cachesizes ...int) Set {
+func Buddy(varnum int, options ...func(*configs)) Set {
 	b := &bdd{}
 	if (varnum < 1) || (varnum > int(_MAXVAR)) {
 		b.seterror("bad number of variable (%d)", varnum)
 		return Set{b}
 	}
+	config := makeconfigs(varnum)
+	for _, f := range options {
+		f(config)
+	}
 	b.varnum = int32(varnum)
 	if _LOGLEVEL > 0 {
 		log.Printf("set varnum to %d\n", b.varnum)
-	}
-	if nodesize < 2*varnum+2 {
-		nodesize = 2*varnum + 2
-	}
-	cachesize := 0
-	cacheratio := 0
-	if len(cachesizes) >= 1 {
-		cachesize = cachesizes[0]
-	}
-	if len(cachesizes) >= 2 {
-		cacheratio = cachesizes[1]
 	}
 	b.varset = make([][2]int, varnum)
 	// We also initialize the refstack.
 	b.refstack = make([]int, 0, 2*varnum+4)
 	b.initref()
 	b.error = nil
-	b.implementation = makebuddy(nodesize, b)
-	b.cacheinit(cachesize, cacheratio)
-	return Set{b}
-}
-
-func makebuddy(nodesize int, config *bdd) *buddy {
-	// initializing the list of nodes
-	b := &buddy{}
-	b.minfreenodes = _MINFREENODES
-	b.maxnodeincrease = _DEFAULTMAXNODEINC
-	nodesize = bdd_prime_gte(nodesize)
-	b.nodes = make([]buddynode, nodesize)
-	for k := range b.nodes {
-		b.nodes[k] = buddynode{
+	impl := &buddy{}
+	impl.minfreenodes = config.minfreenodes
+	impl.maxnodeincrease = config.maxnodeincrease
+	nodesize := bdd_prime_gte(config.nodesize)
+	impl.nodes = make([]buddynode, nodesize)
+	for k := range impl.nodes {
+		impl.nodes[k] = buddynode{
 			refcou: 0,
 			level:  0,
 			low:    -1,
@@ -114,45 +90,47 @@ func makebuddy(nodesize int, config *bdd) *buddy {
 			next:   k + 1,
 		}
 	}
-	b.nodes[nodesize-1].next = 0
-	b.nodes[0].refcou = _MAXREFCOUNT
-	b.nodes[1].refcou = _MAXREFCOUNT
-	b.nodes[0].low = 0
-	b.nodes[0].high = 0
-	b.nodes[1].low = 1
-	b.nodes[1].high = 1
-	b.nodes[0].level = config.varnum
-	b.nodes[1].level = config.varnum
-	b.freepos = 2
-	b.freenum = nodesize - 2
-	b.gcstat.history = []gcpoint{}
-	b.nodefinalizer = func(n *int) {
+	impl.nodes[nodesize-1].next = 0
+	impl.nodes[0].refcou = _MAXREFCOUNT
+	impl.nodes[1].refcou = _MAXREFCOUNT
+	impl.nodes[0].low = 0
+	impl.nodes[0].high = 0
+	impl.nodes[1].low = 1
+	impl.nodes[1].high = 1
+	impl.nodes[0].level = int32(config.varnum)
+	impl.nodes[1].level = int32(config.varnum)
+	impl.freepos = 2
+	impl.freenum = nodesize - 2
+	impl.gcstat.history = []gcpoint{}
+	impl.nodefinalizer = func(n *int) {
 		if _DEBUG {
-			atomic.AddUint64(&(b.gcstat.calledfinalizers), 1)
+			atomic.AddUint64(&(impl.gcstat.calledfinalizers), 1)
 			if _LOGLEVEL > 2 {
 				log.Printf("dec refcou %d\n", *n)
 			}
 		}
-		b.nodes[*n].refcou--
+		impl.nodes[*n].refcou--
 	}
-	for k := int32(0); k < config.varnum; k++ {
-		v0, _ := b.makenode(k, 0, 1, nil)
+	for k := 0; k < config.varnum; k++ {
+		v0, _ := impl.makenode(int32(k), 0, 1, nil)
 		if v0 < 0 {
-			config.seterror("cannot allocate new variable %d in setVarnum", k)
-			return nil
+			b.seterror("cannot allocate new variable %d in setVarnum", k)
+			return Set{b}
 		}
-		b.nodes[v0].refcou = _MAXREFCOUNT
-		config.pushref(v0)
-		v1, _ := b.makenode(k, 1, 0, nil)
+		impl.nodes[v0].refcou = _MAXREFCOUNT
+		b.pushref(v0)
+		v1, _ := impl.makenode(int32(k), 1, 0, nil)
 		if v1 < 0 {
-			config.seterror("cannot allocate new variable %d in setVarnum", k)
-			return nil
+			b.seterror("cannot allocate new variable %d in setVarnum", k)
+			return Set{b}
 		}
-		b.nodes[v1].refcou = _MAXREFCOUNT
-		config.popref(1)
-		config.varset[k] = [2]int{v0, v1}
+		impl.nodes[v1].refcou = _MAXREFCOUNT
+		b.popref(1)
+		b.varset[k] = [2]int{v0, v1}
 	}
-	return b
+	b.implementation = impl
+	b.cacheinit(config)
+	return Set{b}
 }
 
 func (b *buddy) size() int {
@@ -234,7 +212,8 @@ func (b *buddy) stats() string {
 		res += "==============\n"
 		res += fmt.Sprintf("Unique Access:  %d\n", b.uniqueAccess)
 		res += fmt.Sprintf("Unique Chain:   %d\n", b.uniqueChain)
-		res += fmt.Sprintf("Unique Hit:     %d\n", b.uniqueHit)
+		res += fmt.Sprintf("Unique Hit:     %d (%.1f%% + %.1f%%)\n", b.uniqueHit, (float64(b.uniqueHit)*100)/float64(b.uniqueAccess),
+			(float64(b.uniqueAccess-b.uniqueMiss-b.uniqueHit)*100)/float64(b.uniqueAccess))
 		res += fmt.Sprintf("Unique Miss:    %d\n", b.uniqueMiss)
 	}
 	return res

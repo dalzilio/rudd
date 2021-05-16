@@ -52,95 +52,85 @@ func (b *hudd) unmarknode(n int) {
 
 // Hudd initializes a new BDD implemented using the standard runtime hashmap.
 // Options are similar to the case of the Buddy implementation.
-func Hudd(varnum int, nodesize int, cachesizes ...int) Set {
+func Hudd(varnum int, options ...func(*configs)) Set {
 	b := &bdd{}
 	if (varnum < 1) || (varnum > int(_MAXVAR)) {
 		b.seterror("bad number of variable (%d)", varnum)
 		return Set{b}
 	}
+	config := makeconfigs(varnum)
+	for _, f := range options {
+		f(config)
+	}
 	b.varnum = int32(varnum)
 	if _LOGLEVEL > 0 {
 		log.Printf("set varnum to %d\n", b.varnum)
-	}
-	if nodesize < 2*varnum+2 {
-		nodesize = 2*varnum + 2
-	}
-	cachesize := 0
-	cacheratio := 0
-	if len(cachesizes) >= 1 {
-		cachesize = cachesizes[0]
-	}
-	if len(cachesizes) >= 2 {
-		cacheratio = cachesizes[1]
 	}
 	b.varset = make([][2]int, varnum)
 	// We also initialize the refstack.
 	b.refstack = make([]int, 0, 2*varnum+4)
 	b.initref()
 	b.error = nil
-	b.implementation = makehudd(nodesize, b)
-	b.cacheinit(cachesize, cacheratio)
-	return Set{b}
-}
-
-func makehudd(nodesize int, config *bdd) *hudd {
-	b := &hudd{}
-	b.minfreenodes = _MINFREENODES
-	b.maxnodeincrease = _DEFAULTMAXNODEINC
+	impl := &hudd{}
+	impl.minfreenodes = config.minfreenodes
+	impl.maxnodeincrease = config.maxnodeincrease
 	// initializing the list of nodes
-	b.nodes = make([]huddnode, nodesize)
-	for k := range b.nodes {
-		b.nodes[k] = huddnode{
+	nodesize := config.nodesize
+	impl.nodes = make([]huddnode, nodesize)
+	for k := range impl.nodes {
+		impl.nodes[k] = huddnode{
 			level:  0,
 			low:    -1,
 			high:   k + 1,
 			refcou: 0,
 		}
 	}
-	b.nodes[nodesize-1].high = 0
-	b.unique = make(map[[huddsize]byte]int, nodesize)
+	impl.nodes[nodesize-1].high = 0
+	impl.unique = make(map[[huddsize]byte]int, nodesize)
 	// creating bddzero and bddone. We do not add them to the unique table.
-	b.nodes[0] = huddnode{
-		level:  config.varnum,
+	impl.nodes[0] = huddnode{
+		level:  int32(config.varnum),
 		low:    0,
 		high:   0,
 		refcou: _MAXREFCOUNT,
 	}
-	b.nodes[1] = huddnode{
-		level:  config.varnum,
+	impl.nodes[1] = huddnode{
+		level:  int32(config.varnum),
 		low:    1,
 		high:   1,
 		refcou: _MAXREFCOUNT,
 	}
-	b.freepos = 2
-	for k := int32(0); k < config.varnum; k++ {
-		v0, _ := b.makenode(k, 0, 1, nil)
+	impl.freepos = 2
+	for k := 0; k < config.varnum; k++ {
+		v0, _ := impl.makenode(int32(k), 0, 1, nil)
 		if v0 < 0 {
-			config.seterror("cannot allocate new variable %d in setVarnum", k)
-			return b
+			b.seterror("cannot allocate new variable %d in setVarnum", k)
+			return Set{b}
 		}
-		b.nodes[v0].refcou = _MAXREFCOUNT
-		config.pushref(v0)
-		v1, _ := b.makenode(k, 1, 0, nil)
+		impl.nodes[v0].refcou = _MAXREFCOUNT
+		b.pushref(v0)
+		v1, _ := impl.makenode(int32(k), 1, 0, nil)
 		if v1 < 0 {
-			config.seterror("cannot allocate new variable %d in setVarnum", k)
-			return b
+			b.seterror("cannot allocate new variable %d in setVarnum", k)
+			return Set{b}
 		}
-		b.nodes[v1].refcou = _MAXREFCOUNT
-		config.popref(1)
-		config.varset[k] = [2]int{v0, v1}
+		impl.nodes[v1].refcou = _MAXREFCOUNT
+		b.popref(1)
+		b.varset[k] = [2]int{v0, v1}
 	}
-	b.gcstat.history = []gcpoint{}
-	b.nodefinalizer = func(n *int) {
+	impl.gcstat.history = []gcpoint{}
+	impl.nodefinalizer = func(n *int) {
 		if _DEBUG {
-			atomic.AddUint64(&(b.gcstat.calledfinalizers), 1)
+			atomic.AddUint64(&(impl.gcstat.calledfinalizers), 1)
 			if _LOGLEVEL > 2 {
 				log.Printf("dec refcou %d\n", *n)
 			}
 		}
-		b.nodes[*n].refcou--
+		impl.nodes[*n].refcou--
 	}
-	return b
+	b.implementation = impl
+	b.cacheinit(config)
+	return Set{b}
 }
 
 func (b *hudd) huddhash(level int32, low, high int) {
@@ -278,7 +268,8 @@ func (b *hudd) stats() string {
 		res += fmt.Sprintf("Reclaimed:  %d\n", reclaimed)
 		res += "==============\n"
 		res += fmt.Sprintf("Unique Access:  %d\n", b.uniqueAccess)
-		res += fmt.Sprintf("Unique Hit:     %d\n", b.uniqueHit)
+		res += fmt.Sprintf("Unique Hit:     %d (%.1f%% + %.1f%%)\n", b.uniqueHit, (float64(b.uniqueHit)*100)/float64(b.uniqueAccess),
+			(float64(b.uniqueAccess-b.uniqueMiss-b.uniqueHit)*100)/float64(b.uniqueAccess))
 		res += fmt.Sprintf("Unique Miss:    %d\n", b.uniqueMiss)
 	}
 	return res
