@@ -213,7 +213,7 @@ func (bc *applycache) setnot(n, res int) int {
 
 func (bc applycache) String() string {
 	res := fmt.Sprintf("== Apply cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
-	res += fmt.Sprintf(" Operator Hits: %d\n", bc.opHit)
+	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
 }
@@ -251,7 +251,7 @@ func (bc *itecache) setite(f, g, h, res int) int {
 
 func (bc itecache) String() string {
 	res := fmt.Sprintf("== ITE cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
-	res += fmt.Sprintf(" Operator Hits: %d\n", bc.opHit)
+	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
 }
@@ -292,7 +292,7 @@ func (bc *quantcache) setquant(n, varset, res int) int {
 
 func (bc quantcache) String() string {
 	res := fmt.Sprintf("== Quant cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
-	res += fmt.Sprintf(" Operator Hits: %d\n", bc.opHit)
+	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
 }
@@ -333,7 +333,7 @@ func (bc *appexcache) setappex(left, right, res int) int {
 
 func (bc appexcache) String() string {
 	res := fmt.Sprintf("== AppEx cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data4n{})))
-	res += fmt.Sprintf(" Operator Hits: %d\n", bc.opHit)
+	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
 }
@@ -370,7 +370,7 @@ func (bc *replacecache) setreplace(n, res int) int {
 
 func (bc replacecache) String() string {
 	res := fmt.Sprintf("== Replace cache  cache (%s)\n", humanSize(len(bc.table), unsafe.Sizeof(data3n{})))
-	res += fmt.Sprintf(" Operator Hits: %d\n", bc.opHit)
+	res += fmt.Sprintf(" Operator Hits: %d (%.1f%%)\n", bc.opHit, (float64(bc.opHit)*100)/(float64(bc.opHit)+float64(bc.opMiss)))
 	res += fmt.Sprintf(" Operator Miss: %d\n", bc.opMiss)
 	return res
 }

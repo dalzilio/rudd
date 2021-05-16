@@ -142,18 +142,22 @@ func TestMilner(t *testing.T) {
 
 func TestMilner80(t *testing.T) {
 	N := 80
-	bdd, R, err := milner_system(500000, N, true, false)
-	if err != nil {
-		t.Error(err)
+	tt := func(buddy bool) {
+		bdd, R, err := milner_system(50, N, true, buddy)
+		if err != nil {
+			t.Error(err)
+		}
+		expected := big.NewInt(int64(N))
+		pow := big.NewInt(0)
+		pow.SetBit(pow, 4*N+1, 1)
+		expected.Mul(expected, pow)
+		result := bdd.Satcount(R)
+		if result.Cmp(expected) != 0 {
+			t.Errorf("Error in Milner(%d), expected %s, actual %s", N, expected, result)
+		}
 	}
-	expected := big.NewInt(int64(N))
-	pow := big.NewInt(0)
-	pow.SetBit(pow, 4*N+1, 1)
-	expected.Mul(expected, pow)
-	result := bdd.Satcount(R)
-	if result.Cmp(expected) != 0 {
-		t.Errorf("Error in Milner(%d), expected %s, actual %s", N, expected, result)
-	}
+	tt(true)
+	tt(false)
 }
 
 func BenchmarkMilnerBuddy(b *testing.B) {

@@ -5,7 +5,6 @@
 package rudd
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"sync/atomic"
@@ -18,18 +17,18 @@ import (
 // table. We use more space but a benefit is that we can easily migrate to a
 // concurrency-safe hashmap if we want to test concurrent data structures.
 type hudd struct {
-	nodes         []huddnode     // List of all the BDD nodes. Constants are always kept at index 0 and 1
-	unique        map[string]int // Unicity table, used to associate each triplet to a single node
-	freenum       int            // Number of free nodes
-	freepos       int            // First free node
-	produced      int            // Total number of new nodes ever produced
-	hbuff         bytes.Buffer   // Used to compute the hash of nodes. A Buffer needs no initialization.
-	nodefinalizer interface{}    // Finalizer used to decrement the ref count of external references
-	uniqueAccess  int            // accesses to the unique node table
-	uniqueHit     int            // entries actually found in the the unique node table
-	uniqueMiss    int            // entries not found in the the unique node table
-	gcstat                       // Information about garbage collections
-	configs                      // Configurable parameters
+	nodes         []huddnode             // List of all the BDD nodes. Constants are always kept at index 0 and 1
+	unique        map[[huddsize]byte]int // Unicity table, used to associate each triplet to a single node
+	freenum       int                    // Number of free nodes
+	freepos       int                    // First free node
+	produced      int                    // Total number of new nodes ever produced
+	hbuff         [huddsize]byte         // Used to compute the hash of nodes. A Buffer needs no initialization.
+	nodefinalizer interface{}            // Finalizer used to decrement the ref count of external references
+	uniqueAccess  int                    // accesses to the unique node table
+	uniqueHit     int                    // entries actually found in the the unique node table
+	uniqueMiss    int                    // entries not found in the the unique node table
+	gcstat                               // Information about garbage collections
+	configs                              // Configurable parameters
 }
 
 type huddnode struct {
@@ -99,7 +98,7 @@ func makehudd(nodesize int, config *bdd) *hudd {
 		}
 	}
 	b.nodes[nodesize-1].high = 0
-	b.unique = make(map[string]int, nodesize)
+	b.unique = make(map[[huddsize]byte]int, nodesize)
 	// creating bddzero and bddone. We do not add them to the unique table.
 	b.nodes[0] = huddnode{
 		level:  config.varnum,
@@ -144,10 +143,41 @@ func makehudd(nodesize int, config *bdd) *hudd {
 	return b
 }
 
+func (b *hudd) huddhash(level int32, low, high int) {
+	b.hbuff[0] = byte(level)
+	b.hbuff[1] = byte(level >> 8)
+	b.hbuff[2] = byte(level >> 16)
+	b.hbuff[3] = byte(level >> 24)
+	b.hbuff[4] = byte(low)
+	b.hbuff[5] = byte(low >> 8)
+	b.hbuff[6] = byte(low >> 16)
+	b.hbuff[7] = byte(low >> 24)
+	if huddsize == 20 {
+		// 64 bits machine
+		b.hbuff[8] = byte(low >> 32)
+		b.hbuff[9] = byte(low >> 40)
+		b.hbuff[10] = byte(low >> 48)
+		b.hbuff[11] = byte(low >> 56)
+		b.hbuff[12] = byte(high)
+		b.hbuff[13] = byte(high >> 8)
+		b.hbuff[14] = byte(high >> 16)
+		b.hbuff[15] = byte(high >> 24)
+		b.hbuff[16] = byte(high >> 32)
+		b.hbuff[17] = byte(high >> 40)
+		b.hbuff[18] = byte(high >> 48)
+		b.hbuff[19] = byte(high >> 56)
+		return
+	}
+	// 32 bits machine
+	b.hbuff[8] = byte(high)
+	b.hbuff[9] = byte(high >> 8)
+	b.hbuff[10] = byte(high >> 16)
+	b.hbuff[11] = byte(high >> 24)
+}
+
 func (b *hudd) nodehash(level int32, low, high int) (int, bool) {
-	b.hbuff.Reset()
-	fmt.Fprintf(&b.hbuff, "%v %v %v", level, low, high)
-	hn, ok := b.unique[b.hbuff.String()]
+	b.huddhash(level, low, high)
+	hn, ok := b.unique[b.hbuff]
 	return hn, ok
 }
 
@@ -156,10 +186,9 @@ func (b *hudd) nodehash(level int32, low, high int) (int, bool) {
 // unused slot, except when freenum is 0, in which case it is also 0.
 
 func (b *hudd) setnode(level int32, low int, high int, count int32) int {
-	b.hbuff.Reset()
-	fmt.Fprintf(&b.hbuff, "%v %v %v", level, low, high)
+	b.huddhash(level, low, high)
 	b.freenum--
-	b.unique[b.hbuff.String()] = b.freepos
+	b.unique[b.hbuff] = b.freepos
 	res := b.freepos
 	b.freepos = b.nodes[b.freepos].high
 	b.nodes[res] = huddnode{level, low, high, count}
@@ -167,9 +196,8 @@ func (b *hudd) setnode(level int32, low int, high int, count int32) int {
 }
 
 func (b *hudd) delnode(hn huddnode) {
-	b.hbuff.Reset()
-	fmt.Fprintf(&b.hbuff, "%v %v %v", hn.level, hn.low, hn.high)
-	delete(b.unique, b.hbuff.String())
+	b.huddhash(hn.level, hn.low, hn.high)
+	delete(b.unique, b.hbuff)
 }
 
 func (b *hudd) size() int {
