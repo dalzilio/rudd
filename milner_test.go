@@ -159,7 +159,7 @@ func TestMilner80(t *testing.T) {
 func BenchmarkMilnerBuddy(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner_system(500000, 49, true, true); err != nil {
+		if _, _, err := milner_system(500000, 150, true, true); err != nil {
 			b.Error(err)
 		}
 	}
@@ -168,7 +168,7 @@ func BenchmarkMilnerBuddy(b *testing.B) {
 func BenchmarkMilnerHudd(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner_system(500000, 49, true, false); err != nil {
+		if _, _, err := milner_system(500000, 150, true, false); err != nil {
 			b.Error(err)
 		}
 	}

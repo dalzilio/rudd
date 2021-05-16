@@ -9,33 +9,31 @@ type Operator int
 // Operator describe the potential (binary) operations available on an Apply.
 // Only operators OPand to OPnand can be used in AppEx.
 const (
-	OPand       Operator = iota // Boolean conjunction
-	OPxor                       // Exclusive or
-	OPor                        // Disjunction
-	OPnand                      // Negation of and
-	OPnor                       // Negation of or
-	OPimp                       // Implication
-	OPbiimp                     // Equivalence
-	OPdiff                      // Difference
-	OPless                      // Set difference
-	OPinvimp                    // Reverse implication
-	op_not                      // Negation. Should not be used in apply, but used in caches
-	op_simplify                 // same
+	OPand    Operator = iota // Boolean conjunction
+	OPxor                    // Exclusive or
+	OPor                     // Disjunction
+	OPnand                   // Negation of and
+	OPnor                    // Negation of or
+	OPimp                    // Implication
+	OPbiimp                  // Equivalence
+	OPdiff                   // Difference
+	OPless                   // Set difference
+	OPinvimp                 // Reverse implication
+	op_not                   // Negation. The only unary operation. It should not be used in Apply
 )
 
 var opnames = [12]string{
-	OPand:       "and",
-	OPxor:       "xor",
-	OPor:        "or",
-	OPnand:      "nand",
-	OPnor:       "nor",
-	OPimp:       "imp",
-	OPbiimp:     "biimp",
-	OPdiff:      "diff",
-	OPless:      "less",
-	OPinvimp:    "invimp",
-	op_not:      "not",
-	op_simplify: "simplify",
+	OPand:    "and",
+	OPxor:    "xor",
+	OPor:     "or",
+	OPnand:   "nand",
+	OPnor:    "nor",
+	OPimp:    "imp",
+	OPbiimp:  "biimp",
+	OPdiff:   "diff",
+	OPless:   "less",
+	OPinvimp: "invimp",
+	op_not:   "not",
 }
 
 func (op Operator) String() string {

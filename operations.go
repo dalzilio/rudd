@@ -10,10 +10,46 @@ import (
 	"math/big"
 )
 
+// Scanset returns the set of variables (levels) found when following the high
+// branch of node n. This is the dual of function Makeset. The result may be nil
+// if there is an error. The result is not necessarily sorted (but follows the
+// level order).
+func (b *bdd) Scanset(n Node) []int {
+	if b.checkptr(n) != nil {
+		return nil
+	}
+	if *n < 2 {
+		return nil
+	}
+	res := []int{}
+	for i := *n; i > 1; i = b.high(i) {
+		res = append(res, int(b.level(i)))
+	}
+	return res
+}
+
+// Makeset returns a node corresponding to the conjunction (the cube) of all the
+// variable in varset, in their positive form. It is such that
+// scanset(Makeset(a)) == a. It returns False and sets the error condition in b
+// if one of the variables is outside the scope of the BDD (see documentation
+// for function *Ithvar*).
+func (b *bdd) Makeset(varset []int) Node {
+	res := bddone
+	for _, level := range varset {
+		// FIXME: should find a way to do it without adding references
+		tmp := b.Apply(res, b.Ithvar(level), OPand)
+		if b.error != nil {
+			return bddzero
+		}
+		res = tmp
+	}
+	return res
+}
+
 // Not returns the negation of the expression corresponding to node n. It
 // negates a BDD by exchanging all references to the zero-terminal with
 // references to the one-terminal and vice versa.
-func (b *buddy) Not(n Node) Node {
+func (b *bdd) Not(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong operand in call to Not (%d)", *n)
 	}
@@ -24,7 +60,7 @@ func (b *buddy) Not(n Node) Node {
 	return b.retnode(res)
 }
 
-func (b *buddy) not(n int) int {
+func (b *bdd) not(n int) int {
 	if n == 0 {
 		return 1
 	}
@@ -35,9 +71,9 @@ func (b *buddy) not(n int) int {
 	if res := b.matchnot(n); res >= 0 {
 		return res
 	}
-	low := b.pushref(b.not(b.nodes[n].low))
-	high := b.pushref(b.not(b.nodes[n].high))
-	res := b.makenode(b.nodes[n].level, low, high)
+	low := b.pushref(b.not(b.low(n)))
+	high := b.pushref(b.not(b.high(n)))
+	res := b.makenode(b.level(n), low, high)
 	b.popref(2)
 	return b.setnot(n, res)
 }
@@ -58,7 +94,7 @@ func (b *buddy) not(n int) int {
 // 	OPdiff		  set difference 		 [0,0,1,0]
 // 	OPless   	  less than				 [0,1,0,0]
 //  OPinvimp	  reverse implication 	 [1,0,1,1]
-func (b *buddy) Apply(left Node, right Node, op Operator) Node {
+func (b *bdd) Apply(left Node, right Node, op Operator) Node {
 	if b.checkptr(left) != nil {
 		return b.seterror("Wrong operand in call to Apply %s(left: %d, right: ...)", op, *left)
 	}
@@ -74,7 +110,7 @@ func (b *buddy) Apply(left Node, right Node, op Operator) Node {
 	return b.retnode(res)
 }
 
-func (b *buddy) apply(left int, right int) int {
+func (b *bdd) apply(left int, right int) int {
 	switch Operator(b.applycache.op) {
 	case OPand:
 		if left == right {
@@ -194,21 +230,21 @@ func (b *buddy) apply(left int, right int) int {
 	if res := b.matchapply(left, right); res >= 0 {
 		return res
 	}
-	leftlvl := b.nodes[left].level
-	rightlvl := b.nodes[right].level
+	leftlvl := b.level(left)
+	rightlvl := b.level(right)
 	var res int
 	if leftlvl == rightlvl {
-		low := b.pushref(b.apply(b.nodes[left].low, b.nodes[right].low))
-		high := b.pushref(b.apply(b.nodes[left].high, b.nodes[right].high))
+		low := b.pushref(b.apply(b.low(left), b.low(right)))
+		high := b.pushref(b.apply(b.high(left), b.high(right)))
 		res = b.makenode(leftlvl, low, high)
 	} else {
 		if leftlvl < rightlvl {
-			low := b.pushref(b.apply(b.nodes[left].low, right))
-			high := b.pushref(b.apply(b.nodes[left].high, right))
+			low := b.pushref(b.apply(b.low(left), right))
+			high := b.pushref(b.apply(b.high(left), right))
 			res = b.makenode(leftlvl, low, high)
 		} else {
-			low := b.pushref(b.apply(left, b.nodes[right].low))
-			high := b.pushref(b.apply(left, b.nodes[right].high))
+			low := b.pushref(b.apply(left, b.low(right)))
+			high := b.pushref(b.apply(left, b.high(right)))
 			res = b.makenode(rightlvl, low, high)
 		}
 	}
@@ -219,7 +255,7 @@ func (b *buddy) apply(left int, right int) int {
 // Ite, short for if-then-else operator, computes the BDD for the expression [(f
 // /\ g) \/ (not f /\ h)] more efficiently than doing the three operations
 // separately.
-func (b *buddy) Ite(f, g, h Node) Node {
+func (b *bdd) Ite(f, g, h Node) Node {
 	if b.checkptr(f) != nil {
 		return b.seterror("Wrong operand in call to Ite (f: %d)", *f)
 	}
@@ -241,21 +277,36 @@ func (b *buddy) Ite(f, g, h Node) Node {
 // ite_low returns p if p is strictly higher than q or r, otherwise it returns
 // p.low. This is used in function ite to know which node to follow: we always
 // follow the smallest(s) nodes.
-func (b *buddy) ite_low(p, q, r int32, n int) int {
+func (b *bdd) ite_low(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
-	return b.nodes[n].low
+	return b.low(n)
 }
 
-func (b *buddy) ite_high(p, q, r int32, n int) int {
+func (b *bdd) ite_high(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
-	return b.nodes[n].high
+	return b.high(n)
 }
 
-func (b *buddy) ite(f, g, h int) int {
+// min3 returns the smallest value between p, q and r. This is used in function
+// ite to compute the smallest level.
+func min3(p, q, r int32) int32 {
+	if p <= q {
+		if p <= r { // p <= q && p <= r
+			return p
+		}
+		return r // r < p <= q
+	}
+	if q <= r { // q < p && q <= r
+		return q
+	}
+	return r // r < q < p
+}
+
+func (b *bdd) ite(f, g, h int) int {
 	switch {
 	case f == 1:
 		return g
@@ -279,9 +330,9 @@ func (b *buddy) ite(f, g, h int) int {
 	if res := b.matchite(f, g, h); res >= 0 {
 		return res
 	}
-	p := b.nodes[f].level
-	q := b.nodes[g].level
-	r := b.nodes[h].level
+	p := b.level(f)
+	q := b.level(g)
+	r := b.level(h)
 	low := b.pushref(b.ite(b.ite_low(p, q, r, f), b.ite_low(q, p, r, g), b.ite_low(r, p, q, h)))
 	high := b.pushref(b.ite(b.ite_high(p, q, r, f), b.ite_high(q, p, r, g), b.ite_high(r, p, q, h)))
 	res := b.makenode(min3(p, q, r), low, high)
@@ -292,7 +343,7 @@ func (b *buddy) ite(f, g, h int) int {
 // Exist returns the existential quantification of n for the variables in
 // varset, where varset is a node built with a method such as Makeset. We return
 // bdderror and set the error flag in b if there is an error.
-func (b *buddy) Exist(n, varset Node) Node {
+func (b *bdd) Exist(n, varset Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong node in call to Exist (n: %d)", *n)
 	}
@@ -316,21 +367,21 @@ func (b *buddy) Exist(n, varset Node) Node {
 	return b.retnode(res)
 }
 
-func (b *buddy) quant(n, varset int) int {
-	if (n < 2) || (b.nodes[n].level > b.quantlast) {
+func (b *bdd) quant(n, varset int) int {
+	if (n < 2) || (b.level(n) > b.quantlast) {
 		return n
 	}
 	// the hash for a quantification operation is simply n
 	if res := b.matchquant(n, varset); res >= 0 {
 		return res
 	}
-	low := b.pushref(b.quant(b.nodes[n].low, varset))
-	high := b.pushref(b.quant(b.nodes[n].high, varset))
+	low := b.pushref(b.quant(b.low(n), varset))
+	high := b.pushref(b.quant(b.high(n), varset))
 	var res int
-	if b.quantset[b.nodes[n].level] == b.quantsetID {
+	if b.quantset[b.level(n)] == b.quantsetID {
 		res = b.apply(low, high)
 	} else {
-		res = b.makenode(b.nodes[n].level, low, high)
+		res = b.makenode(b.level(n), low, high)
 	}
 	b.popref(2)
 	return b.setquant(n, varset, res)
@@ -343,7 +394,7 @@ func (b *buddy) quant(n, varset int) int {
 // nodes. This makes AppEx much more efficient than an apply operation followed
 // by a quantification. Note that, when *op* is a conjunction, this operation
 // returns the relational product of two BDDs.
-func (b *buddy) AppEx(left Node, right Node, op Operator, varset Node) Node {
+func (b *bdd) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	// FIXME: should check that op is a binary operation
 	if int(op) > 3 {
 		return b.seterror("operator %s not supported in call to AppEx")
@@ -377,7 +428,7 @@ func (b *buddy) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	return b.retnode(res)
 }
 
-func (b *buddy) appquant(left, right, varset int) int {
+func (b *bdd) appquant(left, right, varset int) int {
 	switch Operator(b.appexcache.op) {
 	case OPand:
 		if left == 0 || right == 0 {
@@ -443,7 +494,7 @@ func (b *buddy) appquant(left, right, varset int) int {
 	}
 
 	// and the case where we have no more variables to quantify
-	if (b.nodes[left].level > b.quantlast) && (b.nodes[right].level > b.quantlast) {
+	if (b.level(left) > b.quantlast) && (b.level(right) > b.quantlast) {
 		oldop := b.applycache.op
 		b.applycache.op = b.appexcache.op
 		res := b.apply(left, right)
@@ -455,12 +506,12 @@ func (b *buddy) appquant(left, right, varset int) int {
 	if res := b.matchappex(left, right); res >= 0 {
 		return res
 	}
-	leftlvl := b.nodes[left].level
-	rightlvl := b.nodes[right].level
+	leftlvl := b.level(left)
+	rightlvl := b.level(right)
 	var res int
 	if leftlvl == rightlvl {
-		low := b.pushref(b.appquant(b.nodes[left].low, b.nodes[right].low, varset))
-		high := b.pushref(b.appquant(b.nodes[left].high, b.nodes[right].high, varset))
+		low := b.pushref(b.appquant(b.low(left), b.low(right), varset))
+		high := b.pushref(b.appquant(b.high(left), b.high(right), varset))
 		if b.quantset[leftlvl] == b.quantsetID {
 			res = b.apply(low, high)
 		} else {
@@ -468,16 +519,16 @@ func (b *buddy) appquant(left, right, varset int) int {
 		}
 	} else {
 		if leftlvl < rightlvl {
-			low := b.pushref(b.appquant(b.nodes[left].low, right, varset))
-			high := b.pushref(b.appquant(b.nodes[left].high, right, varset))
+			low := b.pushref(b.appquant(b.low(left), right, varset))
+			high := b.pushref(b.appquant(b.high(left), right, varset))
 			if b.quantset[leftlvl] == b.quantsetID {
 				res = b.apply(low, high)
 			} else {
 				res = b.makenode(leftlvl, low, high)
 			}
 		} else {
-			low := b.pushref(b.appquant(left, b.nodes[right].low, varset))
-			high := b.pushref(b.appquant(left, b.nodes[right].high, varset))
+			low := b.pushref(b.appquant(left, b.low(right), varset))
+			high := b.pushref(b.appquant(left, b.high(right), varset))
 			if b.quantset[rightlvl] == b.quantsetID {
 				res = b.apply(low, high)
 			} else {
@@ -491,7 +542,7 @@ func (b *buddy) appquant(left, right, varset int) int {
 
 // Replace takes a Replacer and computes the result of n after replacing old
 // variables with new ones. See type Replacer.
-func (b *buddy) Replace(n Node, r Replacer) Node {
+func (b *bdd) Replace(n Node, r Replacer) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("wrong operand in call to Replace (%d)", *n)
 	}
@@ -503,51 +554,51 @@ func (b *buddy) Replace(n Node, r Replacer) Node {
 	return res
 }
 
-func (b *buddy) replace(n int, r Replacer) int {
-	image, ok := r.Replace(b.nodes[n].level)
+func (b *bdd) replace(n int, r Replacer) int {
+	image, ok := r.Replace(b.level(n))
 	if !ok {
 		return n
 	}
 	if res := b.matchreplace(n); res >= 0 {
 		return res
 	}
-	low := b.pushref(b.replace(b.nodes[n].low, r))
-	high := b.pushref(b.replace(b.nodes[n].high, r))
+	low := b.pushref(b.replace(b.low(n), r))
+	high := b.pushref(b.replace(b.high(n), r))
 	res := b.correctify(image, low, high)
 	b.popref(2)
 	return b.setreplace(n, res)
 }
 
-func (b *buddy) correctify(level int32, low, high int) int {
+func (b *bdd) correctify(level int32, low, high int) int {
 	/* FIXME: we do not use the cache here */
-	if (level < b.nodes[low].level) && (level < b.nodes[high].level) {
+	if (level < b.level(low)) && (level < b.level(high)) {
 		return b.makenode(level, low, high)
 	}
 
-	if (level == b.nodes[low].level) || (level == b.nodes[high].level) {
-		b.seterror("error in replace level (%d) == low (%d:%d) or high (%d:%d)", level, low, b.nodes[low].level, high, b.nodes[high].level)
+	if (level == b.level(low)) || (level == b.level(high)) {
+		b.seterror("error in replace level (%d) == low (%d:%d) or high (%d:%d)", level, low, b.level(low), high, b.level(high))
 		return -1
 	}
 
-	if b.nodes[low].level == b.nodes[high].level {
-		left := b.pushref(b.correctify(level, b.nodes[low].low, b.nodes[high].low))
-		right := b.pushref(b.correctify(level, b.nodes[low].high, b.nodes[high].high))
-		res := b.makenode(b.nodes[low].level, left, right)
+	if b.level(low) == b.level(high) {
+		left := b.pushref(b.correctify(level, b.low(low), b.low(high)))
+		right := b.pushref(b.correctify(level, b.high(low), b.high(high)))
+		res := b.makenode(b.level(low), left, right)
 		b.popref(2)
 		return res
 	}
 
-	if b.nodes[low].level < b.nodes[high].level {
-		left := b.pushref(b.correctify(level, b.nodes[low].low, high))
-		right := b.pushref(b.correctify(level, b.nodes[low].high, high))
-		res := b.makenode(b.nodes[low].level, left, right)
+	if b.level(low) < b.level(high) {
+		left := b.pushref(b.correctify(level, b.low(low), high))
+		right := b.pushref(b.correctify(level, b.high(low), high))
+		res := b.makenode(b.level(low), left, right)
 		b.popref(2)
 		return res
 	}
 
-	left := b.pushref(b.correctify(level, low, b.nodes[high].low))
-	right := b.pushref(b.correctify(level, low, b.nodes[high].high))
-	res := b.makenode(b.nodes[high].level, left, right)
+	left := b.pushref(b.correctify(level, low, b.low(high)))
+	right := b.pushref(b.correctify(level, low, b.high(high)))
+	res := b.makenode(b.level(high), left, right)
 	b.popref(2)
 	return res
 }
@@ -556,19 +607,19 @@ func (b *buddy) correctify(level int32, low, high int) int {
 // function denoted by n. We return a result using arbitrary-precision
 // arithmetic to avoid possible overflows. The result is zero (and we set the
 // error flag of b) if there is an error.
-func (b *buddy) Satcount(n Node) *big.Int {
+func (b *bdd) Satcount(n Node) *big.Int {
 	res := big.NewInt(0)
 	if b.checkptr(n) != nil {
 		b.seterror("Wrong operand in call to Satcount (%d)", *n)
 		return res
 	}
 	// We compute 2^level with a bit shift 1 << level
-	res.SetBit(res, int(b.nodes[*n].level), 1)
+	res.SetBit(res, int(b.level(*n)), 1)
 	satc := make(map[int]*big.Int)
 	return res.Mul(res, b.satcount(*n, satc))
 }
 
-func (b *buddy) satcount(n int, satc map[int]*big.Int) *big.Int {
+func (b *bdd) satcount(n int, satc map[int]*big.Int) *big.Int {
 	if n < 2 {
 		return big.NewInt(int64(n))
 	}
@@ -577,16 +628,16 @@ func (b *buddy) satcount(n int, satc map[int]*big.Int) *big.Int {
 	if ok {
 		return res
 	}
-	level := b.nodes[n].level
-	low := b.nodes[n].low
-	high := b.nodes[n].high
+	level := b.level(n)
+	low := b.low(n)
+	high := b.high(n)
 
 	res = big.NewInt(0)
 	two := big.NewInt(0)
-	two.SetBit(two, int(b.nodes[low].level-level-1), 1)
+	two.SetBit(two, int(b.level(low)-level-1), 1)
 	res.Add(res, two.Mul(two, b.satcount(low, satc)))
 	two = big.NewInt(0)
-	two.SetBit(two, int(b.nodes[high].level-level-1), 1)
+	two.SetBit(two, int(b.level(high)-level-1), 1)
 	res.Add(res, two.Mul(two, b.satcount(high, satc)))
 	satc[n] = res
 	return res
@@ -605,7 +656,7 @@ func (b *buddy) satcount(n int, satc map[int]*big.Int) *big.Int {
 //       *acc++
 //        return nil
 //      })
-func (b *buddy) Allsat(n Node, f func([]int) error) error {
+func (b *bdd) Allsat(n Node, f func([]int) error) error {
 	if b.checkptr(n) != nil {
 		return fmt.Errorf("wrong node in call to Allsat (%d)", *n)
 	}
@@ -618,7 +669,7 @@ func (b *buddy) Allsat(n Node, f func([]int) error) error {
 	return b.allsat(*n, prof, f)
 }
 
-func (b *buddy) allsat(n int, prof []int, f func([]int) error) error {
+func (b *bdd) allsat(n int, prof []int, f func([]int) error) error {
 	if n == 1 {
 		return f(prof)
 	}
@@ -626,9 +677,9 @@ func (b *buddy) allsat(n int, prof []int, f func([]int) error) error {
 		return nil
 	}
 
-	if low := b.nodes[n].low; low != 0 {
-		prof[b.nodes[n].level] = 0
-		for v := b.nodes[low].level - 1; v > b.nodes[n].level; v-- {
+	if low := b.low(n); low != 0 {
+		prof[b.level(n)] = 0
+		for v := b.level(low) - 1; v > b.level(n); v-- {
 			prof[v] = -1
 		}
 		if err := b.allsat(low, prof, f); err != nil {
@@ -636,9 +687,9 @@ func (b *buddy) allsat(n int, prof []int, f func([]int) error) error {
 		}
 	}
 
-	if high := b.nodes[n].high; high != 0 {
-		prof[b.nodes[n].level] = 1
-		for v := b.nodes[high].level - 1; v > b.nodes[n].level; v-- {
+	if high := b.high(n); high != 0 {
+		prof[b.level(n)] = 1
+		for v := b.level(high) - 1; v > b.level(n); v-- {
 			prof[v] = -1
 		}
 		if err := b.allsat(high, prof, f); err != nil {
@@ -665,7 +716,7 @@ func (b *buddy) allsat(n int, prof []int, f func([]int) error) error {
 //       *acc++
 //        return nil
 //      })
-func (b *buddy) Allnodes(f func(id, level, low, high int) error, n ...Node) error {
+func (b *bdd) Allnodes(f func(id, level, low, high int) error, n ...Node) error {
 	for _, v := range n {
 		if b.checkptr(v) != nil {
 			return fmt.Errorf("wrong node in call to Allnodes (%d)", *v)
@@ -678,45 +729,4 @@ func (b *buddy) Allnodes(f func(id, level, low, high int) error, n ...Node) erro
 		return b.allnodes(f)
 	}
 	return b.allnodesfrom(f, n)
-}
-
-func (b *buddy) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
-	for _, v := range n {
-		b.markrec(*v)
-	}
-	if err := f(0, b.Varnum(), 0, 0); err != nil {
-		b.unmarkall()
-		return err
-	}
-	if err := f(1, b.Varnum(), 1, 1); err != nil {
-		b.unmarkall()
-		return err
-	}
-	for k := range b.nodes {
-		if k > 1 && b.ismarked(k) {
-			b.unmarknode(k)
-			if err := f(k, int(b.nodes[k].level), b.nodes[k].low, b.nodes[k].high); err != nil {
-				b.unmarkall()
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (b *buddy) allnodes(f func(id, level, low, high int) error) error {
-	if err := f(0, b.Varnum(), 0, 0); err != nil {
-		return err
-	}
-	if err := f(1, b.Varnum(), 1, 1); err != nil {
-		return err
-	}
-	for k, v := range b.nodes {
-		if v.low != -1 {
-			if err := f(k, int(v.level), v.low, v.high); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

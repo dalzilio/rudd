@@ -5,6 +5,7 @@
 package rudd
 
 import (
+	"errors"
 	"log"
 	"math"
 	"runtime"
@@ -16,8 +17,7 @@ import (
 func (b *buddy) retnode(n int) Node {
 	if n < 0 || n > len(b.nodes) {
 		if _DEBUG {
-			log.Print(b.Error())
-			log.Panicf("b.retnode(%d) not valid\n", n)
+			log.Panicf("unexpected error; b.retnode(%d) not valid\n", n)
 		}
 		return nil
 	}
@@ -60,16 +60,17 @@ const _MAXREFCOUNT int32 = 0x3FF
 // number of nodes during a resize.
 const _DEFAULTMAXNODEINC int = 500000
 
-func (b *buddy) makenode(level int32, low, high int) int {
+var ErrMemory = errors.New("unable to free memory or resize BDD")
+var ErrResize = errors.New("should cache resize") // when gbc and then noderesize
+var ErrReset = errors.New("should cache reset")   // when gbc only, without resizing
+
+func (b *buddy) makenode(level int32, low, high int, refstack []int) (int, error) {
 	if _DEBUG {
-		b.cacheStat.uniqueAccess++
+		b.uniqueAccess++
 	}
 	// check whether childs are equal or there is an error
 	if low == high {
-		return low
-	}
-	if low == -1 || high == -1 {
-		return -1
+		return low, nil
 	}
 	// otherwise try to find an existing node using the hash and next fields
 	hash := b.nodehash(level, low, high)
@@ -77,36 +78,38 @@ func (b *buddy) makenode(level int32, low, high int) int {
 	for res != 0 {
 		if b.nodes[res].level == level && b.nodes[res].low == low && b.nodes[res].high == high {
 			if _DEBUG {
-				b.cacheStat.uniqueHit++
+				b.uniqueHit++
 			}
-			return res
+			return res, nil
 		}
 		res = b.nodes[res].next
 		if _DEBUG {
-			b.cacheStat.uniqueChain++
+			b.uniqueChain++
 		}
 	}
 	if _DEBUG {
-		b.cacheStat.uniqueMiss++
+		b.uniqueMiss++
 	}
 	// If no existing node, we build one. If there is no available spot
 	// (b.freepos == 0), we try garbage collection and, as a last resort,
 	// resizing the BDD list.
+	var err error
 	if b.freepos == 0 {
 		// We garbage collect unused nodes to try and find spare space.
-		b.gbc()
+		b.gbc(refstack)
+		err = ErrReset
 		// We also test if we are under the threshold for resising.
 		if (b.freenum*100)/len(b.nodes) <= b.minfreenodes {
-			if err := b.noderesize(); err != nil {
-				b.seterror("Unable to free memory or resize BDD")
-				return -1
+			err = b.noderesize()
+			if err != ErrResize {
+				return -1, ErrMemory
 			}
 			hash = b.nodehash(level, low, high)
 		}
 		// Panic if we still have no free positions after all this
 		if b.freepos == 0 {
-			b.seterror("Unable to resize BDD")
-			return -1
+			// b.seterror("Unable to resize BDD")
+			return -1, ErrMemory
 		}
 	}
 	// We can now build the new node in the first available spot
@@ -119,22 +122,22 @@ func (b *buddy) makenode(level int32, low, high int) int {
 	b.nodes[res].high = high
 	b.nodes[res].next = b.nodes[hash].hash
 	b.nodes[hash].hash = res
-	return res
+	return res, err
 }
 
 func (b *buddy) noderesize() error {
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
 	}
-	if b.error != nil {
-		b.seterror("Error before resizing; %s", b.error)
-		return b.error
-	}
+	// if b.error != nil {
+	// 	b.seterror("Error before resizing; %s", b.error)
+	// 	return b.error
+	// }
 	oldsize := len(b.nodes)
 	nodesize := len(b.nodes)
 	if (oldsize >= b.maxnodesize) && (b.maxnodesize > 0) {
-		b.seterror("Cannot resize BDD, already at max capacity (%d nodes)", b.maxnodesize)
-		return b.error
+		// b.seterror("Cannot resize BDD, already at max capacity (%d nodes)", b.maxnodesize)
+		return ErrMemory
 	}
 	if oldsize > (math.MaxInt32 >> 1) {
 		nodesize = math.MaxInt32 - 1
@@ -149,12 +152,10 @@ func (b *buddy) noderesize() error {
 	}
 	nodesize = bdd_prime_lte(nodesize)
 	if nodesize <= oldsize {
-		b.seterror("Unable to grow size of BDD (%d nodes)", nodesize)
-		return b.error
+		// b.seterror("Unable to grow size of BDD (%d nodes)", nodesize)
+		return ErrMemory
 	}
 
-	// FIXME: we could replace realloc with making a bigger slice and copying
-	// values.
 	tmp := b.nodes
 	b.nodes = make([]buddynode, nodesize)
 	copy(b.nodes, tmp)
@@ -189,28 +190,22 @@ func (b *buddy) noderesize() error {
 		}
 	}
 
-	b.cacheresize(len(b.nodes))
-
 	if _LOGLEVEL > 0 {
 		log.Printf("end resize: %d\n", len(b.nodes))
 	}
-
-	return nil
+	// b.cacheresize(len(b.nodes))
+	return ErrResize
 }
 
 // gbc is the garbage collector called for reclaiming memory, inside a call to
 // makenode, when there are no free positions available. Allocated nodes that
 // are not reclaimed do not move.
-func (b *buddy) gbc() {
+func (b *buddy) gbc(refstack []int) {
 	if _LOGLEVEL > 0 {
 		log.Println("starting GC")
 		if _LOGLEVEL > 2 {
 			b.logTable()
 		}
-	}
-
-	if b.error != nil {
-		return
 	}
 
 	// We could  explictly ask the system to run its GC so that we can decrement
@@ -240,7 +235,7 @@ func (b *buddy) gbc() {
 		})
 	}
 	// we mark the nodes in the refstack to avoid collecting them
-	for _, r := range b.refstack {
+	for _, r := range refstack {
 		b.markrec(int(r))
 	}
 	// we also protect nodes with a positive refcount (and therefore also the
@@ -270,7 +265,7 @@ func (b *buddy) gbc() {
 		}
 	}
 	// we also invalidate the caches
-	b.cachereset()
+	// b.cachereset()
 	if _LOGLEVEL > 0 {
 		log.Printf("end GC; freenum: %d\n", b.freenum)
 		if _LOGLEVEL > 2 {
@@ -295,40 +290,4 @@ func (b *buddy) unmarkall() {
 		}
 		b.unmarknode(k)
 	}
-}
-
-// Scanset returns the set of variables (levels) found when following the high
-// branch of node n. This is the dual of function Makeset. The result may be nil
-// if there is an error. The result is not necessarily sorted (but follows the
-// level order).
-func (b *buddy) Scanset(n Node) []int {
-	if b.checkptr(n) != nil {
-		return nil
-	}
-	if *n < 2 {
-		return nil
-	}
-	res := []int{}
-	for i := *n; i > 1; i = b.nodes[i].high {
-		res = append(res, int(b.nodes[i].level))
-	}
-	return res
-}
-
-// Makeset returns a node corresponding to the conjunction (the cube) of all the
-// variable in varset, in their positive form. It is such that
-// scanset(Makeset(a)) == a. It returns False and sets the error condition in b
-// if one of the variables is outside the scope of the BDD (see documentation
-// for function *Ithvar*).
-func (b *buddy) Makeset(varset []int) Node {
-	res := bddone
-	for _, level := range varset {
-		// FIXME: should find a way to do it without adding references
-		tmp := b.Apply(res, b.Ithvar(level), OPand)
-		if b.error != nil {
-			return bddzero
-		}
-		res = tmp
-	}
-	return res
 }

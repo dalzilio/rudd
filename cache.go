@@ -10,16 +10,6 @@ import (
 	"unsafe"
 )
 
-// caches are used for caching apply/exist etc. results
-
-// cacheStat stores status information about cache usage
-type cacheStat struct {
-	uniqueAccess int // accesses to the unique node table
-	uniqueChain  int // iterations through the cache chains in the unique node table
-	uniqueHit    int // entries actually found in the the unique node table
-	uniqueMiss   int // entries not found in the the unique node table
-}
-
 // Hash value modifiers for replace/compose
 const cacheid_REPLACE int = 0x0
 
@@ -107,25 +97,26 @@ func (bc *data3ncache) reset() {
 
 // Setup and shutdown
 
-func (b *caches) cacheinit(size, ratio int) {
-	b.quantset = make([]int32, 0)
+func (b *bdd) cacheinit(size, ratio int) {
 	if size <= 0 {
 		size = 10000
 	}
 	size = bdd_prime_gte(size)
-	b.applycache = applycache{}
+	b.applycache = &applycache{}
 	b.applycache.init(size, ratio)
-	b.itecache = itecache{}
+	b.itecache = &itecache{}
 	b.itecache.init(size, ratio)
-	b.quantcache = quantcache{}
+	b.quantcache = &quantcache{}
 	b.quantcache.init(size, ratio)
-	b.appexcache = appexcache{}
+	b.quantset = make([]int32, b.varnum)
+	b.quantsetID = 0
+	b.appexcache = &appexcache{}
 	b.appexcache.init(size, ratio)
-	b.replacecache = replacecache{}
+	b.replacecache = &replacecache{}
 	b.replacecache.init(size, ratio)
 }
 
-func (b *caches) cachereset() {
+func (b *bdd) cachereset() {
 	b.applycache.reset()
 	b.itecache.reset()
 	b.quantcache.reset()
@@ -133,7 +124,7 @@ func (b *caches) cachereset() {
 	b.replacecache.reset()
 }
 
-func (b *caches) cacheresize(nodesize int) {
+func (b *bdd) cacheresize(nodesize int) {
 	b.applycache.resize(nodesize)
 	b.itecache.resize(nodesize)
 	b.quantcache.resize(nodesize)
@@ -147,7 +138,7 @@ func (b *caches) cacheresize(nodesize int) {
 
 // quantset2cache takes a variable list, similar to the ones generated with
 // Makeset, and set the variables in the quantification cache.
-func (b *buddy) quantset2cache(n int) error {
+func (b *bdd) quantset2cache(n int) error {
 	if n < 2 {
 		b.seterror("Illegal variable (%d) in varset to cache", n)
 		return b.error
@@ -157,42 +148,11 @@ func (b *buddy) quantset2cache(n int) error {
 		b.quantset = make([]int32, b.varnum)
 		b.quantsetID = 1
 	}
-	for i := n; i > 1; i = b.nodes[i].high {
-		b.quantset[b.nodes[i].level] = b.quantsetID
-		b.quantlast = b.nodes[i].level
+	for i := n; i > 1; i = b.high(i) {
+		b.quantset[b.level(i)] = b.quantsetID
+		b.quantlast = b.level(i)
 	}
 	return nil
-}
-
-func (b *hudd) quantset2cache(n int) error {
-	if n < 2 {
-		b.seterror("Illegal variable (%d) in varset to cache", n)
-		return b.error
-	}
-	b.quantsetID++
-	if b.quantsetID == math.MaxInt32 {
-		b.quantset = make([]int32, b.varnum)
-		b.quantsetID = 1
-	}
-	for i := n; i > 1; i = b.nodes[i].high {
-		b.quantset[b.nodes[i].level] = b.quantsetID
-		b.quantlast = b.nodes[i].level
-	}
-	return nil
-}
-
-//
-// Prints information about the cache performance. The information contains the
-// number of accesses to the unique node table, the number of times a node was
-// (not) found there and how many times a hash chain had to traversed. Hit and
-// miss count is also given for the operator caches.
-
-func (c cacheStat) String() string {
-	res := fmt.Sprintf("Unique Access:  %d\n", c.uniqueAccess)
-	res += fmt.Sprintf("Unique Chain:   %d\n", c.uniqueChain)
-	res += fmt.Sprintf("Unique Hit:     %d\n", c.uniqueHit)
-	res += fmt.Sprintf("Unique Miss:    %d\n", c.uniqueMiss)
-	return res
 }
 
 // The hash function for Apply is #(left, right, applycache.op).

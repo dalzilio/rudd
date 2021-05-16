@@ -13,21 +13,6 @@ import (
 	"text/tabwriter"
 )
 
-func (b *bdd) gcstats() string {
-	res := fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history))
-	if _DEBUG {
-		allocated := int(b.gcstat.setfinalizers)
-		reclaimed := int(b.gcstat.calledfinalizers)
-		for _, g := range b.gcstat.history {
-			allocated += g.setfinalizers
-			reclaimed += g.calledfinalizers
-		}
-		res += fmt.Sprintf("Ext. refs:  %d\n", allocated)
-		res += fmt.Sprintf("Reclaimed:  %d\n", reclaimed)
-	}
-	return res
-}
-
 var hsizes []string = []string{"k", "M", "G"}
 
 // humanSize returns a human-readable version of a size in bytes

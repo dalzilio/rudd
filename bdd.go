@@ -4,7 +4,10 @@
 
 package rudd
 
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+)
 
 // Set encapsulates the access to a BDD implementation and provides additionnal
 // functions to ease the display and computation of arbitrary Boolean
@@ -100,43 +103,45 @@ type BDD interface {
 	Stats() string
 }
 
+// implementation is an unexported interface implemented by different BDD
+// structures
+type implementation interface {
+	// retnode creates a Node for external use and sets a finalizer on it so
+	// that the runtime can reclaim the ressource during GC.
+	retnode(n int) Node
+
+	// makenode is the only method for inserting a new BDD node
+	makenode(level int32, low, high int, refstack []int) (int, error)
+
+	// size returns the allocated size for the node table
+	size() int
+
+	// level return s the level of a node
+	level(n int) int32
+
+	low(n int) int
+
+	high(n int) int
+
+	ismarked(n int) bool
+
+	marknode(n int)
+
+	unmarknode(n int)
+
+	// allnodes applies function f over all the nodes accessible in a node table
+	allnodes(f func(id, level, low, high int) error) error
+
+	// allnodesfrom applies function f over all the nodes accessible from the nodes in n
+	allnodesfrom(f func(id, level, low, high int) error, n []Node) error
+
+	// stats return a description of the state of the node table implementation
+	stats() string
+}
+
 // Node is a reference to an element of a BDD. It represents the atomic unit of
 // interactions and computations within a BDD.
 type Node *int
-
-// bdd is the structure shared by all implementations of BDD where we use
-// integer as the key for Nodes.
-type bdd struct {
-	varnum   int32    // number of BDD variables
-	varset   [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
-	refstack []int    // Internal node reference stack
-	produced int      // Total number of new nodes ever produced
-	gcstat            // Information about garbage collections
-	configs           // Configurable parameters
-	caches            // Set of 5 caches used for the operations in the bdd
-	error             // Error status to help chain operations
-}
-
-// Varnum returns the number of defined variables.
-func (b *bdd) Varnum() int {
-	return int(b.varnum)
-}
-
-// caches is a collection of caches used for operations
-type caches struct {
-	applycache   // Cache for apply results
-	itecache     // Cache for ITE results
-	quantcache   // Cache for exist/forall results
-	appexcache   // Cache for AppEx results
-	replacecache // Cache for Replace results
-}
-
-// configs is used to store the values of different parameters of the BDD
-type configs struct {
-	maxnodesize     int // Maximum total number of nodes (0 if no limit)
-	maxnodeincrease int // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
-	minfreenodes    int // Minimum number of nodes that should be left after GC before triggering a resize
-}
 
 // inode returns a Node for known nodes, such as variables, that do not need to
 // increase their reference count.
@@ -149,10 +154,57 @@ var bddone Node = inode(1)
 
 var bddzero Node = inode(0)
 
-// private functions to manipulate the refstack; used to prevent nodes that are
-// currently being built (e.g. transient nodes built during an apply) to be
-// reclaimed during GC.
+// bdd is the structure shared by all implementations of BDD where we use
+// integer as the key for Nodes.
+type bdd struct {
+	varnum         int32    // number of BDD variables
+	varset         [][2]int // Set of variables used: we have a pair for each variable for its positive and negative occurrence
+	refstack       []int    // Internal node reference stack
+	error                   // Error status to help chain operations
+	caches                  // Set of 5 caches used for the operations in the bdd
+	implementation          // Underlying structure that encapsulate the list of nodes
+}
 
+// Varnum returns the number of defined variables.
+func (b *bdd) Varnum() int {
+	return int(b.varnum)
+}
+
+func (b *bdd) makenode(level int32, low, high int) int {
+	res, err := b.implementation.makenode(level, low, high, b.refstack)
+	if err == nil {
+		return res
+	}
+	if err == ErrReset {
+		b.cachereset()
+		return res
+	}
+	if err == ErrResize {
+		b.cacheresize(b.size())
+		return res
+	}
+	return res
+}
+
+// caches is a collection of caches used for operations
+type caches struct {
+	*applycache   // Cache for apply results
+	*itecache     // Cache for ITE results
+	*quantcache   // Cache for exist/forall results
+	*appexcache   // Cache for AppEx results
+	*replacecache // Cache for Replace results
+}
+
+// configs is used to store the values of different parameters of the BDD
+type configs struct {
+	maxnodesize     int // Maximum total number of nodes (0 if no limit)
+	maxnodeincrease int // Maximum number of nodes that can be added to the table at each resize (0 if no limit)
+	minfreenodes    int // Minimum number of nodes that should be left after GC before triggering a resize
+}
+
+// initref is part of three private functions to manipulate the refstack; used
+// to prevent nodes that are currently being built (e.g. transient nodes built
+// during an apply) to be reclaimed during GC.
 func (b *bdd) initref() {
 	b.refstack = b.refstack[:0]
 }
@@ -181,69 +233,89 @@ type gcpoint struct {
 	calledfinalizers int // Number of external references that were freed
 }
 
-// And returns the logical 'and' of a sequence of nodes.
-func (b Set) And(n ...Node) Node {
-	if len(n) == 1 {
-		return n[0]
+// checkptr performs a sanity check prior to accessing a node and return eventual
+// error code.
+func (b *bdd) checkptr(n Node) error {
+	switch {
+	case n == nil:
+		b.seterror("Illegal acces to node (nil value)")
+		return b.error
+	case (*n < 0) || (*n >= b.size()):
+		b.seterror("Illegal acces to node %d", *n)
+		return b.error
+	case (*n >= 2) && (b.low(*n) == -1):
+		b.seterror("Illegal acces to node %d", *n)
+		return b.error
 	}
-	if len(n) == 0 {
-		return bddone
-	}
-	return b.Apply(n[0], b.And(n[1:]...), OPand)
+	return nil
 }
 
-// Or returns the logical 'or' of a sequence of BDDs.
-func (b Set) Or(n ...Node) Node {
-	if len(n) == 1 {
-		return n[0]
-	}
-	if len(n) == 0 {
+// Ithvar returns a BDD representing the i'th variable on success, otherwise we
+// set the error status in the BDD and returns the constant False. The requested
+// variable must be in the range [0..Varnum).
+func (b *bdd) Ithvar(i int) Node {
+	if (i < 0) || (int32(i) >= b.varnum) {
+		b.seterror("Unknown variable used (%d) in call to ithvar", i)
 		return bddzero
 	}
-	return b.Apply(n[0], b.Or(n[1:]...), OPor)
+	// we do not need to reference count variables
+	return inode(b.varset[i][0])
 }
 
-// Imp returns the logical 'implication' between two BDDs.
-func (b Set) Imp(n1, n2 Node) Node {
-	return b.Apply(n1, n2, OPimp)
-}
-
-// Equiv returns the logical 'bi-implication' between two BDDs.
-func (b Set) Equiv(n1, n2 Node) Node {
-	return b.Apply(n1, n2, OPbiimp)
-}
-
-// Equal tests equivalence between nodes.
-func (b Set) Equal(low, high Node) bool {
-	if low == high {
-		return true
+// NIthvar returns a bdd representing the negation of the i'th variable on
+// success, otherwise the constant false bdd. See *ithvar* for further info.
+func (b *bdd) NIthvar(i int) Node {
+	if (i < 0) || (int32(i) >= b.varnum) {
+		return b.seterror("Unknown variable used (%d) in call to nithvar", i)
 	}
-	if low == nil || high == nil {
-		return false
+	// we do not need to reference count variables
+	return inode(b.varset[i][1])
+}
+
+// Label returns the variable (index) corresponding to node n in the BDD. We set
+// the BDD to its error state and return -1 if we try to access a constant node.
+func (b *bdd) Label(n Node) int {
+	if b.checkptr(n) != nil {
+		b.seterror("Illegal access to node %d in call to Label", n)
+		return -1
 	}
-	return *low == *high
-}
-
-// AndExists returns the "relational composition" of two nodes with respect to
-// varset, meaning the result of (Exists varset . n1 & n2).
-func (b Set) AndExist(varset, n1, n2 Node) Node {
-	return b.AppEx(n1, n2, OPand, varset)
-}
-
-// True returns the constant true BDD
-func (b Set) True() Node {
-	return bddone
-}
-
-// False returns the constant false BDD
-func (b Set) False() Node {
-	return bddzero
-}
-
-// From returns a (constant) Node from a boolean value.
-func (b Set) From(v bool) Node {
-	if v {
-		return bddone
+	if *n < 2 {
+		b.seterror("Try to access label of constant node")
+		return -1
 	}
-	return bddzero
+	return int(b.level(*n))
+}
+
+// Low returns the false branch of a BDD. We return bdderror if there is an
+// error and set the error flag in the BDD.
+func (b *bdd) Low(n Node) Node {
+	if b.checkptr(n) != nil {
+		return b.seterror("Illegal access to node %d in call to Low", n)
+	}
+	return b.retnode(b.low(*n))
+}
+
+// High returns the true branch of a BDD. We return bdderror if there is an
+// error and set the error flag in the BDD.
+func (b *bdd) High(n Node) Node {
+	if b.checkptr(n) != nil {
+		return b.seterror("Illegal access to node %d in call to High", n)
+	}
+	return b.retnode(b.high(*n))
+}
+
+// Stats returns information about the BDD
+func (b *bdd) Stats() string {
+	res := "==============\n"
+	res += fmt.Sprintf("Varnum:     %d\n", b.varnum)
+	res += b.stats()
+	if _DEBUG {
+		res += "==============\n"
+		res += b.applycache.String()
+		res += b.itecache.String()
+		res += b.quantcache.String()
+		res += b.appexcache.String()
+		res += b.replacecache.String()
+	}
+	return res
 }
