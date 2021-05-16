@@ -31,8 +31,8 @@ const _MAXVAR int32 = 0x1FFFFF
 const _MAXREFCOUNT int32 = 0x3FF
 
 // _DEFAULTMAXNODEINC is the default value for the maximal increase in the
-// number of nodes during a resize. It is approx. half a million  (524 288).
-const _DEFAULTMAXNODEINC int = 1 << 19
+// number of nodes during a resize. It is approx. a million nodes (1 048 576).
+const _DEFAULTMAXNODEINC int = 1 << 20
 
 var errMemory = errors.New("unable to free memory or resize BDD")
 var errResize = errors.New("should cache resize") // when gbc and then noderesize
@@ -147,7 +147,7 @@ func (b *buddy) noderesize() error {
 	} else {
 		nodesize = nodesize << 1
 	}
-	if nodesize > (oldsize + b.maxnodeincrease) {
+	if b.maxnodeincrease > 0 && nodesize > (oldsize+b.maxnodeincrease) {
 		nodesize = oldsize + b.maxnodeincrease
 	}
 	if (nodesize > b.maxnodesize) && (b.maxnodesize > 0) {

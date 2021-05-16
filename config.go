@@ -48,7 +48,8 @@ func Maxnodesize(size int) func(*configs) {
 
 // Maxnodeincrease sets a limit on the increase in size of the node table. Below
 // this limit we typically double the size of the node list each time we need to
-// resize it. The default value is about half a million nodes.
+// resize it. The default value is about a million nodes. Set the value to zero
+// to avoid imposing a limit.
 func Maxnodeincrease(size int) func(*configs) {
 	return func(c *configs) {
 		c.maxnodeincrease = size

@@ -161,7 +161,7 @@ func (b *hudd) noderesize() error {
 	} else {
 		nodesize = nodesize << 1
 	}
-	if nodesize > (oldsize + b.maxnodeincrease) {
+	if b.maxnodeincrease > 0 && nodesize > (oldsize+b.maxnodeincrease) {
 		nodesize = oldsize + b.maxnodeincrease
 	}
 	if (nodesize > b.maxnodesize) && (b.maxnodesize > 0) {
