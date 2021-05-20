@@ -104,3 +104,9 @@ func TestNQueens(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkNQueens(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		nqueens_system(12)
+	}
+}
