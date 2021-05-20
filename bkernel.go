@@ -7,7 +7,6 @@
 package rudd
 
 import (
-	"errors"
 	"log"
 	"math"
 	"runtime"
@@ -16,7 +15,7 @@ import (
 
 // retnode creates a Node for external use and sets a finalizer on it so that we
 // can reclaim the ressource during GC.
-func (b *implementation) retnode(n int) Node {
+func (b *tables) retnode(n int) Node {
 	if n < 0 || n > len(b.nodes) {
 		if _DEBUG {
 			log.Panicf("unexpected error; b.retnode(%d) not valid\n", n)
@@ -43,7 +42,7 @@ func (b *implementation) retnode(n int) Node {
 	return &x
 }
 
-func (b *implementation) makenode(level int32, low, high int, refstack []int) (int, error) {
+func (b *tables) makenode(level int32, low, high int, refstack []int) (int, error) {
 	if _DEBUG {
 		b.uniqueAccess++
 	}
@@ -104,7 +103,7 @@ func (b *implementation) makenode(level int32, low, high int, refstack []int) (i
 	return res, err
 }
 
-func (b *implementation) noderesize() error {
+func (b *tables) noderesize() error {
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
 	}
@@ -179,7 +178,7 @@ func (b *implementation) noderesize() error {
 // gbc is the garbage collector called for reclaiming memory, inside a call to
 // makenode, when there are no free positions available. Allocated nodes that
 // are not reclaimed do not move.
-func (b *implementation) gbc(refstack []int) {
+func (b *tables) gbc(refstack []int) {
 	if _LOGLEVEL > 0 {
 		log.Println("starting GC")
 	}
@@ -247,7 +246,7 @@ func (b *implementation) gbc(refstack []int) {
 	}
 }
 
-func (b *implementation) markrec(n int) {
+func (b *tables) markrec(n int) {
 	if n < 2 || b.ismarked(n) || (b.nodes[n].low == -1) {
 		return
 	}
@@ -256,7 +255,7 @@ func (b *implementation) markrec(n int) {
 	b.markrec(b.nodes[n].high)
 }
 
-func (b *implementation) unmarkall() {
+func (b *tables) unmarkall() {
 	for k, v := range b.nodes {
 		if k < 2 || !b.ismarked(k) || (v.low == -1) {
 			continue

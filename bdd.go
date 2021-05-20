@@ -144,15 +144,16 @@ var bddone Node = inode(1)
 
 var bddzero Node = inode(0)
 
-// bdd is the structure shared by all implementations of BDD where we use
-// integer as the key for Nodes.
+// BDD is the type of Binary Decision Diagrams. We propose multiple
+// implementations (two at the moment) all based on an approach where we use
+// integers as the key for Nodes.
 type BDD struct {
-	varnum         int32    // Number of BDD variables.
-	varset         [][2]int // Set of variables used for Ithvar and NIthvar: we have a pair for each variable for its positive and negative occurrence
-	refstack       []int    // Internal node reference stack, used to avoid collecting nodes while they are being processed.
-	error                   // Error status: we use nil Nodes to signal a problem and store the error in this field. This help chain operations together.
-	caches                  // Set of caches used for the operations in the BDD
-	implementation          // Underlying struct that encapsulates the list of nodes
+	varnum   int32    // Number of BDD variables.
+	varset   [][2]int // Set of variables used for Ithvar and NIthvar: we have a pair for each variable for its positive and negative occurrence
+	refstack []int    // Internal node reference stack, used to avoid collecting nodes while they are being processed.
+	error             // Error status: we use nil Nodes to signal a problem and store the error in this field. This help chain operations together.
+	caches            // Set of caches used for the operations in the BDD
+	*tables           // Underlying struct that encapsulates the list of nodes
 }
 
 // Varnum returns the number of defined variables.
@@ -161,7 +162,7 @@ func (b *BDD) Varnum() int {
 }
 
 func (b *BDD) makenode(level int32, low, high int) int {
-	res, err := b.implementation.makenode(level, low, high, b.refstack)
+	res, err := b.tables.makenode(level, low, high, b.refstack)
 	if err == nil {
 		return res
 	}

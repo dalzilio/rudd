@@ -2,7 +2,7 @@
 //
 // MIT License
 
-// !build buddy
+// +build !buddy
 
 package rudd
 
@@ -13,12 +13,12 @@ import (
 	"unsafe"
 )
 
-// implementation corresponds to Binary Decision Diagrams based on the runtime
+// tables corresponds to Binary Decision Diagrams based on the runtime
 // hashmap. We hash a triplet (level, low, high) to a []byte and use the unique
 // table to associate this triplet to an entry in the nodes table. We use more
 // space but a benefit is that we can easily migrate to a concurrency-safe
 // hashmap if we want to test concurrent data structures.
-type implementation struct {
+type tables struct {
 	nodes         []huddnode             // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	unique        map[[huddsize]byte]int // Unicity table, used to associate each triplet to a single node
 	freenum       int                    // Number of free nodes
@@ -40,20 +40,20 @@ type huddnode struct {
 	refcou int32 // Count the number of external references
 }
 
-func (b *implementation) ismarked(n int) bool {
+func (b *tables) ismarked(n int) bool {
 	return (b.nodes[n].refcou & 0x200000) != 0
 }
 
-func (b *implementation) marknode(n int) {
+func (b *tables) marknode(n int) {
 	b.nodes[n].refcou |= 0x200000
 }
 
-func (b *implementation) unmarknode(n int) {
+func (b *tables) unmarknode(n int) {
 	b.nodes[n].refcou &= 0x1FFFFF
 }
 
-// New returns a new BDD based on the implementation selected with the build
-// tag; meaning the 'Hudd'-style BDD by default (based on the standard runtime
+// New returns a new BDD based on an implementation selected with the build tag;
+// meaning the 'Hudd'-style BDD by default (based on the standard runtime
 // hashmap) or a 'BuDDy'-style BDD if tags buddy is set. Parameter varnum is the
 // number of variables in the BDD.
 //
@@ -83,7 +83,7 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 	b.refstack = make([]int, 0, 2*varnum+4)
 	b.initref()
 	b.error = nil
-	impl := implementation{}
+	impl := &tables{}
 	impl.minfreenodes = config.minfreenodes
 	impl.maxnodeincrease = config.maxnodeincrease
 	// initializing the list of nodes
@@ -140,12 +140,12 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 		}
 		impl.nodes[*n].refcou--
 	}
-	b.implementation = impl
+	b.tables = impl
 	b.cacheinit(config)
 	return b, nil
 }
 
-func (b *implementation) huddhash(level int32, low, high int) {
+func (b *tables) huddhash(level int32, low, high int) {
 	b.hbuff[0] = byte(level)
 	b.hbuff[1] = byte(level >> 8)
 	b.hbuff[2] = byte(level >> 16)
@@ -177,7 +177,7 @@ func (b *implementation) huddhash(level int32, low, high int) {
 	b.hbuff[11] = byte(high >> 24)
 }
 
-func (b *implementation) nodehash(level int32, low, high int) (int, bool) {
+func (b *tables) nodehash(level int32, low, high int) (int, bool) {
 	b.huddhash(level, low, high)
 	hn, ok := b.unique[b.hbuff]
 	return hn, ok
@@ -187,7 +187,7 @@ func (b *implementation) nodehash(level int32, low, high int) (int, bool) {
 // next free position. The value of b.freepos gives the index of the lowest
 // unused slot, except when freenum is 0, in which case it is also 0.
 
-func (b *implementation) setnode(level int32, low int, high int, count int32) int {
+func (b *tables) setnode(level int32, low int, high int, count int32) int {
 	b.huddhash(level, low, high)
 	b.freenum--
 	b.unique[b.hbuff] = b.freepos
@@ -197,28 +197,28 @@ func (b *implementation) setnode(level int32, low int, high int, count int32) in
 	return res
 }
 
-func (b *implementation) delnode(hn huddnode) {
+func (b *tables) delnode(hn huddnode) {
 	b.huddhash(hn.level, hn.low, hn.high)
 	delete(b.unique, b.hbuff)
 }
 
-func (b *implementation) size() int {
+func (b *tables) size() int {
 	return len(b.nodes)
 }
 
-func (b *implementation) level(n int) int32 {
+func (b *tables) level(n int) int32 {
 	return b.nodes[n].level
 }
 
-func (b *implementation) low(n int) int {
+func (b *tables) low(n int) int {
 	return b.nodes[n].low
 }
 
-func (b *implementation) high(n int) int {
+func (b *tables) high(n int) int {
 	return b.nodes[n].high
 }
 
-func (b *implementation) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
+func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
 	for _, v := range n {
 		b.markrec(*v)
 	}
@@ -242,7 +242,7 @@ func (b *implementation) allnodesfrom(f func(id, level, low, high int) error, n 
 	return nil
 }
 
-func (b *implementation) allnodes(f func(id, level, low, high int) error) error {
+func (b *tables) allnodes(f func(id, level, low, high int) error) error {
 	if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
 		return err
 	}
@@ -260,8 +260,9 @@ func (b *implementation) allnodes(f func(id, level, low, high int) error) error 
 }
 
 // stats returns information about the implementation
-func (b *implementation) stats() string {
-	res := fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
+func (b *tables) stats() string {
+	res := "Impl.:      Hudd\n"
+	res += fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
 	res += fmt.Sprintf("Produced:   %d\n", b.produced)
 	r := (float64(b.freenum) / float64(len(b.nodes))) * 100
 	res += fmt.Sprintf("Free:       %d  (%.3g %%)\n", b.freenum, r)

@@ -13,10 +13,10 @@ import (
 	"unsafe"
 )
 
-// implementation is used with the build ta buddy and corresponds to Binary
-// Decision Diagrams based on the data structures and algorithms found in the
-// BuDDy library.
-type implementation struct {
+// tables is used with the build tag buddy and corresponds to Binary Decision
+// Diagrams based on the data structures and algorithms found in the BuDDy
+// library.
+type tables struct {
 	nodes         []buddynode // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	freenum       int         // Number of free nodes
 	freepos       int         // First free node
@@ -39,25 +39,25 @@ type buddynode struct {
 	next   int   // Next index to check in case of a collision, 0 if last
 }
 
-func (b *implementation) ismarked(n int) bool {
+func (b *tables) ismarked(n int) bool {
 	return (b.nodes[n].level & 0x200000) != 0
 }
 
-func (b *implementation) marknode(n int) {
+func (b *tables) marknode(n int) {
 	b.nodes[n].level = b.nodes[n].level | 0x200000
 }
 
-func (b *implementation) unmarknode(n int) {
+func (b *tables) unmarknode(n int) {
 	b.nodes[n].level = b.nodes[n].level & 0x1FFFFF
 }
 
 // The hash function for nodes is #(level, low, high)
 
-func (b *implementation) ptrhash(n int) int {
+func (b *tables) ptrhash(n int) int {
 	return _TRIPLE(int(b.nodes[n].level), b.nodes[n].low, b.nodes[n].high, len(b.nodes))
 }
 
-func (b *implementation) nodehash(level int32, low, high int) int {
+func (b *tables) nodehash(level int32, low, high int) int {
 	return _TRIPLE(int(level), low, high, len(b.nodes))
 }
 
@@ -92,7 +92,7 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 	b.refstack = make([]int, 0, 2*varnum+4)
 	b.initref()
 	b.error = nil
-	impl := implementation{}
+	impl := &tables{}
 	impl.minfreenodes = config.minfreenodes
 	impl.maxnodeincrease = config.maxnodeincrease
 	nodesize := bdd_prime_gte(config.nodesize)
@@ -145,28 +145,28 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 		b.popref(1)
 		b.varset[k] = [2]int{v0, v1}
 	}
-	b.implementation = impl
+	b.tables = impl
 	b.cacheinit(config)
 	return b, nil
 }
 
-func (b *implementation) size() int {
+func (b *tables) size() int {
 	return len(b.nodes)
 }
 
-func (b *implementation) level(n int) int32 {
+func (b *tables) level(n int) int32 {
 	return b.nodes[n].level
 }
 
-func (b *implementation) low(n int) int {
+func (b *tables) low(n int) int {
 	return b.nodes[n].low
 }
 
-func (b *implementation) high(n int) int {
+func (b *tables) high(n int) int {
 	return b.nodes[n].high
 }
 
-func (b *implementation) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
+func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
 	for _, v := range n {
 		b.markrec(*v)
 	}
@@ -190,7 +190,7 @@ func (b *implementation) allnodesfrom(f func(id, level, low, high int) error, n 
 	return nil
 }
 
-func (b *implementation) allnodes(f func(id, level, low, high int) error) error {
+func (b *tables) allnodes(f func(id, level, low, high int) error) error {
 	if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
 		return err
 	}
@@ -208,8 +208,9 @@ func (b *implementation) allnodes(f func(id, level, low, high int) error) error 
 }
 
 // Stats returns information about the BDD
-func (b *implementation) stats() string {
-	res := fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
+func (b *tables) stats() string {
+	res := "Impl.:      BuDDy\n"
+	res += fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
 	res += fmt.Sprintf("Produced:   %d\n", b.produced)
 	r := (float64(b.freenum) / float64(len(b.nodes))) * 100
 	res += fmt.Sprintf("Free:       %d  (%.3g %%)\n", b.freenum, r)

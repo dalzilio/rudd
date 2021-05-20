@@ -82,18 +82,18 @@ func (b *BDD) not(n int) int {
 // AND, OR etc. Left and right are the operand and opr is the requested
 // operation and must be one of the following:
 //
-//  Identifier    Description			 Truth table
+//    Identifier    Description             Truth table
 //
-//  OPand		  logical and    		 [0,0,0,1]
-//  OPxor		  logical xor     		 [0,1,1,0]
-//	OPor		  logical or   			 [0,1,1,1]
-// 	OPnand 		  logical not-and		 [1,1,1,0]
-// 	OPnor		  logical not-or    	 [1,0,0,0]
-// 	OPimp		  implication 			 [1,1,0,1]
-// 	OPbiimp		  equivalence			 [1,0,0,1]
-// 	OPdiff		  set difference 		 [0,0,1,0]
-// 	OPless   	  less than				 [0,1,0,0]
-//  OPinvimp	  reverse implication 	 [1,0,1,1]
+//    OPand         logical and              [0,0,0,1]
+//    OPxor         logical xor              [0,1,1,0]
+//    OPor          logical or               [0,1,1,1]
+//    OPnand        logical not-and          [1,1,1,0]
+//    OPnor         logical not-or           [1,0,0,0]
+//    OPimp         implication              [1,1,0,1]
+//    OPbiimp       equivalence              [1,0,0,1]
+//    OPdiff        set difference           [0,0,1,0]
+//    OPless        less than                [0,1,0,0]
+//    OPinvimp      reverse implication      [1,0,1,1]
 func (b *BDD) Apply(left Node, right Node, op Operator) Node {
 	if b.checkptr(left) != nil {
 		return b.seterror("Wrong operand in call to Apply %s(left: %d, right: ...)", op, *left)
