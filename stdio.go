@@ -5,10 +5,8 @@
 package rudd
 
 import (
-	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"text/tabwriter"
 )
@@ -38,13 +36,15 @@ func humanSize(b int, unit uintptr) string {
 	}
 }
 
-// PrintSet outputs a textual representation of the BDD with root n to the
-// standard output. We print all the nodes in b if n is nil.
-func (b *BDD) Print(n ...Node) {
-	b.print(os.Stdout, n...)
-}
-
-func (b *BDD) print(w io.Writer, n ...Node) {
+// Print writes a textual representation of the BDD with roots in n to an output
+// stream. The result is a table with rows giving the levels and ids of the
+// nodes and its low and high part.
+//
+// We print all the nodes in b if n is absent (len(n) == 0), so a call to
+// b.Print(os.Stdout) prints a table containing all the active nodes of the BDD
+// to the standard output. We also simply print the string "True" and "False",
+// respectively, if len(n) == 1 and n[0] is the constant True or False.
+func (b *BDD) Print(w io.Writer, n ...Node) {
 	if mesg := b.Error(); mesg != "" {
 		fmt.Fprintf(w, "Error: %s\n", mesg)
 		return
@@ -87,24 +87,13 @@ func print_set(w io.Writer, nodes [][4]int) {
 	tw.Flush()
 }
 
-// PrintDot prints a graph-like description of the BDD with roots in n using the
-// DOT format; or the whole Set if n is missing.
-func (b *BDD) PrintDot(filename string, n ...Node) error {
-	var out *os.File
-	var err error
-	if filename == "-" {
-		out = os.Stdout
-	} else {
-		out, err = os.Create(filename)
-		if err != nil {
-			return err
-		}
-		defer out.Close()
-	}
-	w := bufio.NewWriter(out)
+// Dot  writes a graph-like description of the BDD with roots in n to an output
+// stream using the DOT format. The behavior of Dot is very similar to the one
+// of Print. In particular, we include all the active nodes of b if n is absent
+// (len(n) == 0).
+func (b *BDD) Dot(w io.Writer, n ...Node) error {
 	if mesg := b.Error(); mesg != "" {
 		fmt.Fprintf(w, "Error: %s\n", mesg)
-		w.Flush()
 		return fmt.Errorf(mesg)
 	}
 	// we write the result by visiting each node but we never draw edges to the
@@ -124,7 +113,6 @@ func (b *BDD) PrintDot(filename string, n ...Node) error {
 		return nil
 	}, n...)
 	fmt.Fprintln(w, "}")
-	w.Flush()
 	return nil
 }
 

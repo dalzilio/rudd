@@ -7,7 +7,7 @@ package rudd
 type Operator int
 
 // Operator describe the potential (binary) operations available on an Apply.
-// Only operators OPand to OPnand can be used in AppEx.
+// Only the first four operators (from OPand to OPnand) can be used in AppEx.
 const (
 	OPand    Operator = iota // Boolean conjunction
 	OPxor                    // Exclusive or

@@ -31,7 +31,7 @@ func TestOperations(t *testing.T) {
 		allsatSumBDD := bdd.False()
 		// Calculate whole set of asignments and remove all assignments
 		// from original set
-		bdd.Allsat(x, func(varset []int) error {
+		bdd.Allsat(func(varset []int) error {
 			x := bdd.True()
 			for k, v := range varset {
 				switch v {
@@ -47,7 +47,7 @@ func TestOperations(t *testing.T) {
 			// Remove assignment from initial set
 			allsatBDD = bdd.Apply(allsatBDD, x, OPdiff)
 			return nil
-		})
+		}, x)
 
 		// Now the summed set should be equal to the original set and the
 		// subtracted set should be empty

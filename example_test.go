@@ -26,7 +26,44 @@ func Example_basic() {
 	n3 := bdd.AndExist(n1, n2, bdd.Ithvar(3))
 	// You can print the result or export a BDD in Graphviz's DOT format
 	log.Print(bdd.Stats())
-	fmt.Printf("Number of sat. assignments: %s\n", bdd.Satcount(n3))
+	fmt.Printf("Number of sat. assignments is %s\n", bdd.Satcount(n3))
 	// Output:
-	// Number of sat. assignments: 48
+	// Number of sat. assignments is 48
+}
+
+// The following is an example of a callback handler, used in a call to Allsat,
+// that counts the number of possible assignments (such that we do not count
+// don't care twice).
+func Example_allsat() {
+	bdd, _ := rudd.New(5)
+	// n == ∃ x2,x3 . (x1 | !x3 | x4) & x3
+	n := bdd.AndExist(bdd.Makeset([]int{2, 3}),
+		bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
+		bdd.Ithvar(3))
+	acc := new(int)
+	bdd.Allsat(func(varset []int) error {
+		*acc++
+		return nil
+	}, n)
+	fmt.Printf("Number of sat. assignments (without don't care) is %d", *acc)
+	// Output:
+	// Number of sat. assignments (without don't care) is 2
+
+}
+
+// The following is an example of a callback handler, used in a call to
+// Allnodes, that counts the number of active nodes in the whole BDD.
+func Example_allnodes() {
+	bdd, _ := rudd.New(5)
+	bdd.AndExist(bdd.Makeset([]int{2, 3}),
+		bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
+		bdd.Ithvar(3))
+	acc := new(int)
+	bdd.Allnodes(func(id, level, low, high int) error {
+		*acc++
+		return nil
+	})
+	fmt.Printf("Number of active nodes in BDD is %d", *acc)
+	// Output:
+	// Number of active nodes in BDD is 18
 }

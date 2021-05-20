@@ -12,8 +12,8 @@ import (
 
 // Scanset returns the set of variables (levels) found when following the high
 // branch of node n. This is the dual of function Makeset. The result may be nil
-// if there is an error. The result is not necessarily sorted (but follows the
-// level order).
+// if there is an error and it is sorted following the natural order between
+// levels.
 func (b *BDD) Scanset(n Node) []int {
 	if b.checkptr(n) != nil {
 		return nil
@@ -46,9 +46,9 @@ func (b *BDD) Makeset(varset []int) Node {
 	return res
 }
 
-// Not returns the negation of the expression corresponding to node n. It
-// negates a BDD by exchanging all references to the zero-terminal with
-// references to the one-terminal and vice versa.
+// Not returns the negation of the expression corresponding to node n; it
+// computes the result of !n. We negate a BDD by exchanging all references to
+// the zero-terminal with references to the one-terminal and vice versa.
 func (b *BDD) Not(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong operand in call to Not (%d)", *n)
@@ -79,8 +79,7 @@ func (b *BDD) not(n int) int {
 }
 
 // Apply performs all of the basic bdd operations with two operands, such as
-// AND, OR etc. Left and right are the operand and opr is the requested
-// operation and must be one of the following:
+// AND, OR etc. Operator opr must be one of the following:
 //
 //    Identifier    Description             Truth table
 //
@@ -94,18 +93,18 @@ func (b *BDD) not(n int) int {
 //    OPdiff        set difference           [0,0,1,0]
 //    OPless        less than                [0,1,0,0]
 //    OPinvimp      reverse implication      [1,0,1,1]
-func (b *BDD) Apply(left Node, right Node, op Operator) Node {
-	if b.checkptr(left) != nil {
-		return b.seterror("Wrong operand in call to Apply %s(left: %d, right: ...)", op, *left)
+func (b *BDD) Apply(n1, n2 Node, op Operator) Node {
+	if b.checkptr(n1) != nil {
+		return b.seterror("Wrong operand in call to Apply %s(n1: %d, n2: ...)", op, *n1)
 	}
-	if b.checkptr(right) != nil {
-		return b.seterror("Wrong operand in call to Apply %s(left: ..., right: %d)", op, *right)
+	if b.checkptr(n2) != nil {
+		return b.seterror("Wrong operand in call to Apply %s(n1: ..., n2: %d)", op, *n2)
 	}
 	b.applycache.op = int(op)
 	b.initref()
-	b.pushref(*left)
-	b.pushref(*right)
-	res := b.apply(*left, *right)
+	b.pushref(*n1)
+	b.pushref(*n2)
+	res := b.apply(*n1, *n2)
 	b.popref(2)
 	return b.retnode(res)
 }
@@ -253,8 +252,7 @@ func (b *BDD) apply(left int, right int) int {
 }
 
 // Ite, short for if-then-else operator, computes the BDD for the expression [(f
-// /\ g) \/ (not f /\ h)] more efficiently than doing the three operations
-// separately.
+// & g) | (!f & h)] more efficiently than doing the three operations separately.
 func (b *BDD) Ite(f, g, h Node) Node {
 	if b.checkptr(f) != nil {
 		return b.seterror("Wrong operand in call to Ite (f: %d)", *f)
@@ -342,7 +340,7 @@ func (b *BDD) ite(f, g, h int) int {
 
 // Exist returns the existential quantification of n for the variables in
 // varset, where varset is a node built with a method such as Makeset. We return
-// bdderror and set the error flag in b if there is an error.
+// nil and set the error flag in b if there is an error.
 func (b *BDD) Exist(n, varset Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong node in call to Exist (n: %d)", *n)
@@ -387,14 +385,14 @@ func (b *BDD) quant(n, varset int) int {
 	return b.setquant(n, varset, res)
 }
 
-// AppEx applies the binary operator *op* on the two operands left and right
-// then performs an existential quantification over the variables in varset.
-// This is done in a bottom up manner such that both the apply and
-// quantification is done on the lower nodes before stepping up to the higher
-// nodes. This makes AppEx much more efficient than an apply operation followed
-// by a quantification. Note that, when *op* is a conjunction, this operation
-// returns the relational product of two BDDs.
-func (b *BDD) AppEx(left Node, right Node, op Operator, varset Node) Node {
+// AppEx applies the binary operator *op* on the two operands, n1 and n2, then
+// performs an existential quantification over the variables in varset; meaning
+// it computes the value of (∃ varset . n1 op n2). This is done in a bottom up
+// manner such that both the apply and quantification is done on the lower nodes
+// before stepping up to the higher nodes. This makes AppEx much more efficient
+// than an apply operation followed by a quantification. Note that, when *op* is
+// a conjunction, this operation returns the relational product of two BDDs.
+func (b *BDD) AppEx(n1, n2 Node, op Operator, varset Node) Node {
 	// FIXME: should check that op is a binary operation
 	if int(op) > 3 {
 		return b.seterror("operator %s not supported in call to AppEx")
@@ -403,13 +401,13 @@ func (b *BDD) AppEx(left Node, right Node, op Operator, varset Node) Node {
 		return b.seterror("wrong varset in call to AppEx (%d)", *varset)
 	}
 	if *varset < 2 { // we have an empty set
-		return b.Apply(left, right, op)
+		return b.Apply(n1, n2, op)
 	}
-	if b.checkptr(left) != nil {
-		return b.seterror("wrong operand in call to AppEx %s(left: %d)", op, *left)
+	if b.checkptr(n1) != nil {
+		return b.seterror("wrong operand in call to AppEx %s(left: %d)", op, *n1)
 	}
-	if b.checkptr(right) != nil {
-		return b.seterror("wrong operand in call to AppEx %s(right: %d)", op, *right)
+	if b.checkptr(n2) != nil {
+		return b.seterror("wrong operand in call to AppEx %s(right: %d)", op, *n2)
 	}
 	if err := b.quantset2cache(*varset); err != nil {
 		return nil
@@ -420,10 +418,10 @@ func (b *BDD) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	b.appexcache.id = (*varset << 2) | b.appexcache.op
 	b.quantcache.id = (b.appexcache.id << 3) | cacheid_APPEX
 	b.initref()
-	b.pushref(*left)
-	b.pushref(*right)
+	b.pushref(*n1)
+	b.pushref(*n2)
 	b.pushref(*varset)
-	res := b.appquant(*left, *right, *varset)
+	res := b.appquant(*n1, *n2, *varset)
 	b.popref(3)
 	return b.retnode(res)
 }
@@ -648,15 +646,7 @@ func (b *BDD) satcount(n int, satc map[int]*big.Int) *big.Int {
 // each entry is either  0 if the variable is false, 1 if it is true, and -1 if
 // it is a don't care. We stop and return an error if f returns an error at some
 // point.
-//
-// The following is an example of a callback handler that counts the number of
-// possible assignments (such that we do not count don't care twice):
-//     acc := new(int)
-//     b.Allsat(n, func(varset []int) error {
-//       *acc++
-//        return nil
-//      })
-func (b *BDD) Allsat(n Node, f func([]int) error) error {
+func (b *BDD) Allsat(f func([]int) error, n Node) error {
 	if b.checkptr(n) != nil {
 		return fmt.Errorf("wrong node in call to Allsat (%d)", *n)
 	}
@@ -700,26 +690,17 @@ func (b *BDD) allsat(n int, prof []int, f func([]int) error) error {
 }
 
 // Allnodes applies function f over all the nodes accessible from the nodes in
-// the sequence n..., or all the active nodes if n is absent. The parameters to
-// function f are the id, level, and id's of the low and high successors of each
-// node. The two constant nodes (True and False) have always the id 1 and 0,
-// respectively.
-//
-// The order in which nodes are visited is not specified. The behavior is very
-// similar to the one of Allsat. In particular, we stop the computation and
-// return an error if f returns an error at some point.
-//
-// The following is an example of a callback handler that counts the number of
-// active nodes in the BDD:
-//     acc := new(int)
-//     b.List(func(varset []int, n1, n2) error {
-//       *acc++
-//        return nil
-//      })
+// the sequence n..., or all the active nodes if n is absent (len(n) == 0). The
+// parameters to function f are the id, level, and id's of the low and high
+// successors of each node. The two constant nodes (True and False) have always
+// the id 1 and 0, respectively. The order in which nodes are visited is not
+// specified. The behavior is very similar to the one of Allsat. In particular,
+// we stop the computation and return an error if f returns an error at some
+// point.
 func (b *BDD) Allnodes(f func(id, level, low, high int) error, n ...Node) error {
 	for _, v := range n {
-		if b.checkptr(v) != nil {
-			return fmt.Errorf("wrong node in call to Allnodes (%d)", *v)
+		if err := b.checkptr(v); err != nil {
+			return fmt.Errorf("wrong node in call to Allnodes; %s", err)
 		}
 	}
 	// the function does not create new nodes, so we do not need to take care of

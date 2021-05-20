@@ -144,9 +144,10 @@ var bddone Node = inode(1)
 
 var bddzero Node = inode(0)
 
-// BDD is the type of Binary Decision Diagrams. We propose multiple
-// implementations (two at the moment) all based on an approach where we use
-// integers as the key for Nodes.
+// BDD is the type of Binary Decision Diagrams. A BDD is a pointer to an
+// unexported (struct) type that encapsulates the internal states of a BDD; such
+// as a node table. We propose multiple implementations (two at the moment) all
+// based on approaches where we use integers as the key for Nodes.
 type BDD struct {
 	varnum   int32    // Number of BDD variables.
 	varset   [][2]int // Set of variables used for Ithvar and NIthvar: we have a pair for each variable for its positive and negative occurrence
@@ -234,20 +235,20 @@ func (b *BDD) checkptr(n Node) error {
 	return nil
 }
 
-// Ithvar returns a BDD representing the i'th variable on success, otherwise we
-// set the error status in the BDD and returns the constant False. The requested
-// variable must be in the range [0..Varnum).
+// Ithvar returns a BDD representing the i'th variable on success (the
+// expression xi), otherwise we set the error status in the BDD and returns the
+// nil node. The requested variable must be in the range [0..Varnum).
 func (b *BDD) Ithvar(i int) Node {
 	if (i < 0) || (int32(i) >= b.varnum) {
-		b.seterror("Unknown variable used (%d) in call to ithvar", i)
-		return bddzero
+		return b.seterror("Unknown variable used (%d) in call to ithvar", i)
 	}
 	// we do not need to reference count variables
 	return inode(b.varset[i][0])
 }
 
-// NIthvar returns a bdd representing the negation of the i'th variable on
-// success, otherwise the constant false bdd. See *ithvar* for further info.
+// NIthvar returns a node representing the negation of the i'th variable on
+// success (the expression !xi), otherwise the nil node. See *ithvar* for
+// further info.
 func (b *BDD) NIthvar(i int) Node {
 	if (i < 0) || (int32(i) >= b.varnum) {
 		return b.seterror("Unknown variable used (%d) in call to nithvar", i)
@@ -270,8 +271,8 @@ func (b *BDD) Label(n Node) int {
 	return int(b.level(*n))
 }
 
-// Low returns the false branch of a BDD. We return bdderror if there is an
-// error and set the error flag in the BDD.
+// Low returns the false (or low) branch of a BDD. We return nil and set the
+// error flag in the BDD if there is an error.
 func (b *BDD) Low(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Illegal access to node %d in call to Low", n)
@@ -279,8 +280,8 @@ func (b *BDD) Low(n Node) Node {
 	return b.retnode(b.low(*n))
 }
 
-// High returns the true branch of a BDD. We return bdderror if there is an
-// error and set the error flag in the BDD.
+// High returns the true (or high) branch of a BDD. We return nil and set the
+// error flag in the BDD if there is an error.
 func (b *BDD) High(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Illegal access to node %d in call to High", n)
@@ -288,7 +289,8 @@ func (b *BDD) High(n Node) Node {
 	return b.retnode(b.high(*n))
 }
 
-// And returns the logical 'and' of a sequence of nodes.
+// And returns the logical 'and' of a sequence of nodes or, equivalently,
+// computes the intersection of a sequence of Boolean vectors.
 func (b *BDD) And(n ...Node) Node {
 	if len(n) == 1 {
 		return n[0]
@@ -299,7 +301,8 @@ func (b *BDD) And(n ...Node) Node {
 	return b.Apply(n[0], b.And(n[1:]...), OPand)
 }
 
-// Or returns the logical 'or' of a sequence of BDDs.
+// Or returns the logical 'or' of a sequence of nodes or, equivalently, computes
+// the union of a sequence of Boolean vectors.
 func (b *BDD) Or(n ...Node) Node {
 	if len(n) == 1 {
 		return n[0]
@@ -321,33 +324,36 @@ func (b *BDD) Equiv(n1, n2 Node) Node {
 }
 
 // Equal tests equivalence between nodes.
-func (b *BDD) Equal(low, high Node) bool {
-	if low == high {
+func (b *BDD) Equal(n1, n2 Node) bool {
+	if n1 == n2 {
 		return true
 	}
-	if low == nil || high == nil {
+	if n1 == nil || n2 == nil {
 		return false
 	}
-	return *low == *high
+	return *n1 == *n2
 }
 
 // AndExists returns the "relational composition" of two nodes with respect to
-// varset, meaning the result of (Exists varset . n1 & n2).
+// varset, meaning the result of (∃ varset . n1 & n2).
 func (b *BDD) AndExist(varset, n1, n2 Node) Node {
 	return b.AppEx(n1, n2, OPand, varset)
 }
 
-// True returns the constant true BDD
+// True returns the constant true BDD (a node pointing to the value 1). Our
+// implementation ensures that this pointer is unique. Hence two succesive call
+// to True should return the same node.
 func (b *BDD) True() Node {
 	return bddone
 }
 
-// False returns the constant false BDD
+// False returns the constant false BDD (a node pointing to the value 0).
 func (b *BDD) False() Node {
 	return bddzero
 }
 
-// From returns a (constant) Node from a boolean value.
+// From returns a (constant) Node from a boolean value. We return the (BDD)
+// value True if v is true and False otherwise.
 func (b *BDD) From(v bool) Node {
 	if v {
 		return bddone
@@ -355,7 +361,9 @@ func (b *BDD) From(v bool) Node {
 	return bddzero
 }
 
-// Stats returns information about the BDD
+// Stats returns information about the BDD. It is possible to print more
+// information about the caches and memory footprint of the BDD by compiling
+// your executable with the build tag 'debug'.
 func (b *BDD) Stats() string {
 	res := "==============\n"
 	res += fmt.Sprintf("Varnum:     %d\n", b.varnum)

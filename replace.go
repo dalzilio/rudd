@@ -11,8 +11,11 @@ import (
 
 var _REPLACEID = 1
 
-// Replacer is the type of association lists used to replace variables in a BDD
-// node.
+// Replacer is the types of substitution objects used in a Replace operation,
+// that substitutes variables in a BDD "function". The only method returning an
+// object of this type is the NewReplacer method. The result obtained when using
+// a replacer created from a BDD, in a Replace operation over a different BDD is
+// unspecified.
 type Replacer interface {
 	Replace(int32) (int32, bool)
 	Id() int
@@ -50,11 +53,11 @@ func (r *replacer) Id() int {
 	return r.id
 }
 
-// NewReplacer returns a Replacer for substituting variable oldvars[k] with
-// newvars[k]. We return an error if the two slices do not have the same length
-// or if we find the same index twice in either of them. All values must be in
-// [0..Varnum).
-func (b *BDD) NewReplacer(oldvars []int, newvars []int) (Replacer, error) {
+// NewReplacer returns a Replacer that can be used for substituting variable
+// oldvars[k] with newvars[k] in the BDD b. We return an error if the two slices
+// do not have the same length or if we find the same index twice in either of
+// them. All values must be in the interval [0..Varnum).
+func (b *BDD) NewReplacer(oldvars, newvars []int) (Replacer, error) {
 	res := &replacer{}
 	if len(oldvars) != len(newvars) {
 		return nil, fmt.Errorf("unmatched length of slices")
