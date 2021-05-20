@@ -142,10 +142,10 @@ func main() {
   n2 := bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4))
   // n3 == ∃ x2,x3,x5 . (n2 & x3)
   n3 := bdd.AndExist(n1, n2, bdd.Ithvar(3))
-  // you can print the result or export a BDD in Graphviz's DOT format
-  bdd.PrintDot("out.dot", n3)
+  // you can export a BDD in Graphviz's DOT format
   fmt.Printf("Number of sat. assignments: %s\n", bdd.Satcount(n3))
   fmt.Println(bdd.Stats())
+  bdd.Dot(os.Stdout)
 }
 ```
 
