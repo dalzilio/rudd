@@ -47,7 +47,7 @@ when calling from Go into C, which is one of the major pain points of working
 with Go.  
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/dalzilio/rudd)](https://goreportcard.com/report/github.com/dalzilio/rudd)
-[![GoDoc](https://godoc.org/github.com/dalzilio/mcc?status.svg)](https://godoc.org/github.com/dalzilio/rudd)
+[![GoDoc](https://godoc.org/github.com/dalzilio/rudd?status.svg)](https://godoc.org/github.com/dalzilio/rudd)
 [![Release](https://img.shields.io/github/v/release/dalzilio/rudd)](https://github.com/dalzilio/rudd/releases)
 
 ## Installation

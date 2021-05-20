@@ -2,6 +2,8 @@
 //
 // MIT License
 
+// +build buddy
+
 package rudd
 
 import (
@@ -12,35 +14,9 @@ import (
 	"sync/atomic"
 )
 
-// number of bytes in a int (adapted from uintSize in the math/bits package)
-const huddsize = (2*(32<<(^uint(0)>>32&1)) + 32) / 8 // 12 (32 bits) or 20 (64 bits)
-
-// _MINFREENODES is the minimal number of nodes (%) that has to be left after a
-// garbage collect unless a resize should be done.
-const _MINFREENODES int = 20
-
-// _MAXVAR is the maximal number of levels in the BDD. We use only the first 21
-// bits for encoding levels (so also the max number of variables). We use 11
-// other bits for markings. Hence we make sure to always use int32 to avoid
-// problem when we change architecture.
-const _MAXVAR int32 = 0x1FFFFF
-
-// _MAXREFCOUNT is the maximal value of the reference counter (refcou), also
-// used to stick nodes (like constants and variables) in the node list. It is
-// egal to 1023 (10 bits).
-const _MAXREFCOUNT int32 = 0x3FF
-
-// _DEFAULTMAXNODEINC is the default value for the maximal increase in the
-// number of nodes during a resize. It is approx. a million nodes (1 048 576).
-const _DEFAULTMAXNODEINC int = 1 << 20
-
-var errMemory = errors.New("unable to free memory or resize BDD")
-var errResize = errors.New("should cache resize") // when gbc and then noderesize
-var errReset = errors.New("should cache reset")   // when gbc only, without resizing
-
 // retnode creates a Node for external use and sets a finalizer on it so that we
 // can reclaim the ressource during GC.
-func (b *buddy) retnode(n int) Node {
+func (b *implementation) retnode(n int) Node {
 	if n < 0 || n > len(b.nodes) {
 		if _DEBUG {
 			log.Panicf("unexpected error; b.retnode(%d) not valid\n", n)
@@ -67,7 +43,7 @@ func (b *buddy) retnode(n int) Node {
 	return &x
 }
 
-func (b *buddy) makenode(level int32, low, high int, refstack []int) (int, error) {
+func (b *implementation) makenode(level int32, low, high int, refstack []int) (int, error) {
 	if _DEBUG {
 		b.uniqueAccess++
 	}
@@ -128,7 +104,7 @@ func (b *buddy) makenode(level int32, low, high int, refstack []int) (int, error
 	return res, err
 }
 
-func (b *buddy) noderesize() error {
+func (b *implementation) noderesize() error {
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
 	}
@@ -203,12 +179,9 @@ func (b *buddy) noderesize() error {
 // gbc is the garbage collector called for reclaiming memory, inside a call to
 // makenode, when there are no free positions available. Allocated nodes that
 // are not reclaimed do not move.
-func (b *buddy) gbc(refstack []int) {
+func (b *implementation) gbc(refstack []int) {
 	if _LOGLEVEL > 0 {
 		log.Println("starting GC")
-		if _LOGLEVEL > 2 {
-			b.logTable()
-		}
 	}
 
 	// We could  explictly ask the system to run its GC so that we can decrement
@@ -271,13 +244,10 @@ func (b *buddy) gbc(refstack []int) {
 	// b.cachereset()
 	if _LOGLEVEL > 0 {
 		log.Printf("end GC; freenum: %d\n", b.freenum)
-		if _LOGLEVEL > 2 {
-			b.logTable()
-		}
 	}
 }
 
-func (b *buddy) markrec(n int) {
+func (b *implementation) markrec(n int) {
 	if n < 2 || b.ismarked(n) || (b.nodes[n].low == -1) {
 		return
 	}
@@ -286,7 +256,7 @@ func (b *buddy) markrec(n int) {
 	b.markrec(b.nodes[n].high)
 }
 
-func (b *buddy) unmarkall() {
+func (b *implementation) unmarkall() {
 	for k, v := range b.nodes {
 		if k < 2 || !b.ismarked(k) || (v.low == -1) {
 			continue

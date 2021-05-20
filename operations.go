@@ -14,7 +14,7 @@ import (
 // branch of node n. This is the dual of function Makeset. The result may be nil
 // if there is an error. The result is not necessarily sorted (but follows the
 // level order).
-func (b *bdd) Scanset(n Node) []int {
+func (b *BDD) Scanset(n Node) []int {
 	if b.checkptr(n) != nil {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (b *bdd) Scanset(n Node) []int {
 // scanset(Makeset(a)) == a. It returns False and sets the error condition in b
 // if one of the variables is outside the scope of the BDD (see documentation
 // for function *Ithvar*).
-func (b *bdd) Makeset(varset []int) Node {
+func (b *BDD) Makeset(varset []int) Node {
 	res := bddone
 	for _, level := range varset {
 		// FIXME: should find a way to do it without adding references
@@ -49,7 +49,7 @@ func (b *bdd) Makeset(varset []int) Node {
 // Not returns the negation of the expression corresponding to node n. It
 // negates a BDD by exchanging all references to the zero-terminal with
 // references to the one-terminal and vice versa.
-func (b *bdd) Not(n Node) Node {
+func (b *BDD) Not(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong operand in call to Not (%d)", *n)
 	}
@@ -60,7 +60,7 @@ func (b *bdd) Not(n Node) Node {
 	return b.retnode(res)
 }
 
-func (b *bdd) not(n int) int {
+func (b *BDD) not(n int) int {
 	if n == 0 {
 		return 1
 	}
@@ -94,7 +94,7 @@ func (b *bdd) not(n int) int {
 // 	OPdiff		  set difference 		 [0,0,1,0]
 // 	OPless   	  less than				 [0,1,0,0]
 //  OPinvimp	  reverse implication 	 [1,0,1,1]
-func (b *bdd) Apply(left Node, right Node, op Operator) Node {
+func (b *BDD) Apply(left Node, right Node, op Operator) Node {
 	if b.checkptr(left) != nil {
 		return b.seterror("Wrong operand in call to Apply %s(left: %d, right: ...)", op, *left)
 	}
@@ -110,7 +110,7 @@ func (b *bdd) Apply(left Node, right Node, op Operator) Node {
 	return b.retnode(res)
 }
 
-func (b *bdd) apply(left int, right int) int {
+func (b *BDD) apply(left int, right int) int {
 	switch Operator(b.applycache.op) {
 	case OPand:
 		if left == right {
@@ -255,7 +255,7 @@ func (b *bdd) apply(left int, right int) int {
 // Ite, short for if-then-else operator, computes the BDD for the expression [(f
 // /\ g) \/ (not f /\ h)] more efficiently than doing the three operations
 // separately.
-func (b *bdd) Ite(f, g, h Node) Node {
+func (b *BDD) Ite(f, g, h Node) Node {
 	if b.checkptr(f) != nil {
 		return b.seterror("Wrong operand in call to Ite (f: %d)", *f)
 	}
@@ -277,14 +277,14 @@ func (b *bdd) Ite(f, g, h Node) Node {
 // ite_low returns p if p is strictly higher than q or r, otherwise it returns
 // p.low. This is used in function ite to know which node to follow: we always
 // follow the smallest(s) nodes.
-func (b *bdd) ite_low(p, q, r int32, n int) int {
+func (b *BDD) ite_low(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
 	return b.low(n)
 }
 
-func (b *bdd) ite_high(p, q, r int32, n int) int {
+func (b *BDD) ite_high(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
@@ -306,7 +306,7 @@ func min3(p, q, r int32) int32 {
 	return r // r < q < p
 }
 
-func (b *bdd) ite(f, g, h int) int {
+func (b *BDD) ite(f, g, h int) int {
 	switch {
 	case f == 1:
 		return g
@@ -343,7 +343,7 @@ func (b *bdd) ite(f, g, h int) int {
 // Exist returns the existential quantification of n for the variables in
 // varset, where varset is a node built with a method such as Makeset. We return
 // bdderror and set the error flag in b if there is an error.
-func (b *bdd) Exist(n, varset Node) Node {
+func (b *BDD) Exist(n, varset Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong node in call to Exist (n: %d)", *n)
 	}
@@ -367,7 +367,7 @@ func (b *bdd) Exist(n, varset Node) Node {
 	return b.retnode(res)
 }
 
-func (b *bdd) quant(n, varset int) int {
+func (b *BDD) quant(n, varset int) int {
 	if (n < 2) || (b.level(n) > b.quantlast) {
 		return n
 	}
@@ -394,7 +394,7 @@ func (b *bdd) quant(n, varset int) int {
 // nodes. This makes AppEx much more efficient than an apply operation followed
 // by a quantification. Note that, when *op* is a conjunction, this operation
 // returns the relational product of two BDDs.
-func (b *bdd) AppEx(left Node, right Node, op Operator, varset Node) Node {
+func (b *BDD) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	// FIXME: should check that op is a binary operation
 	if int(op) > 3 {
 		return b.seterror("operator %s not supported in call to AppEx")
@@ -428,7 +428,7 @@ func (b *bdd) AppEx(left Node, right Node, op Operator, varset Node) Node {
 	return b.retnode(res)
 }
 
-func (b *bdd) appquant(left, right, varset int) int {
+func (b *BDD) appquant(left, right, varset int) int {
 	switch Operator(b.appexcache.op) {
 	case OPand:
 		if left == 0 || right == 0 {
@@ -542,7 +542,7 @@ func (b *bdd) appquant(left, right, varset int) int {
 
 // Replace takes a Replacer and computes the result of n after replacing old
 // variables with new ones. See type Replacer.
-func (b *bdd) Replace(n Node, r Replacer) Node {
+func (b *BDD) Replace(n Node, r Replacer) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("wrong operand in call to Replace (%d)", *n)
 	}
@@ -554,7 +554,7 @@ func (b *bdd) Replace(n Node, r Replacer) Node {
 	return res
 }
 
-func (b *bdd) replace(n int, r Replacer) int {
+func (b *BDD) replace(n int, r Replacer) int {
 	image, ok := r.Replace(b.level(n))
 	if !ok {
 		return n
@@ -569,7 +569,7 @@ func (b *bdd) replace(n int, r Replacer) int {
 	return b.setreplace(n, res)
 }
 
-func (b *bdd) correctify(level int32, low, high int) int {
+func (b *BDD) correctify(level int32, low, high int) int {
 	/* FIXME: we do not use the cache here */
 	if (level < b.level(low)) && (level < b.level(high)) {
 		return b.makenode(level, low, high)
@@ -607,7 +607,7 @@ func (b *bdd) correctify(level int32, low, high int) int {
 // function denoted by n. We return a result using arbitrary-precision
 // arithmetic to avoid possible overflows. The result is zero (and we set the
 // error flag of b) if there is an error.
-func (b *bdd) Satcount(n Node) *big.Int {
+func (b *BDD) Satcount(n Node) *big.Int {
 	res := big.NewInt(0)
 	if b.checkptr(n) != nil {
 		b.seterror("Wrong operand in call to Satcount (%d)", *n)
@@ -619,7 +619,7 @@ func (b *bdd) Satcount(n Node) *big.Int {
 	return res.Mul(res, b.satcount(*n, satc))
 }
 
-func (b *bdd) satcount(n int, satc map[int]*big.Int) *big.Int {
+func (b *BDD) satcount(n int, satc map[int]*big.Int) *big.Int {
 	if n < 2 {
 		return big.NewInt(int64(n))
 	}
@@ -656,7 +656,7 @@ func (b *bdd) satcount(n int, satc map[int]*big.Int) *big.Int {
 //       *acc++
 //        return nil
 //      })
-func (b *bdd) Allsat(n Node, f func([]int) error) error {
+func (b *BDD) Allsat(n Node, f func([]int) error) error {
 	if b.checkptr(n) != nil {
 		return fmt.Errorf("wrong node in call to Allsat (%d)", *n)
 	}
@@ -669,7 +669,7 @@ func (b *bdd) Allsat(n Node, f func([]int) error) error {
 	return b.allsat(*n, prof, f)
 }
 
-func (b *bdd) allsat(n int, prof []int, f func([]int) error) error {
+func (b *BDD) allsat(n int, prof []int, f func([]int) error) error {
 	if n == 1 {
 		return f(prof)
 	}
@@ -716,7 +716,7 @@ func (b *bdd) allsat(n int, prof []int, f func([]int) error) error {
 //       *acc++
 //        return nil
 //      })
-func (b *bdd) Allnodes(f func(id, level, low, high int) error, n ...Node) error {
+func (b *BDD) Allnodes(f func(id, level, low, high int) error, n ...Node) error {
 	for _, v := range n {
 		if b.checkptr(v) != nil {
 			return fmt.Errorf("wrong node in call to Allnodes (%d)", *v)

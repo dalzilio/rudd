@@ -54,7 +54,7 @@ func (r *replacer) Id() int {
 // newvars[k]. We return an error if the two slices do not have the same length
 // or if we find the same index twice in either of them. All values must be in
 // [0..Varnum).
-func (b Set) NewReplacer(oldvars []int, newvars []int) (Replacer, error) {
+func (b *BDD) NewReplacer(oldvars []int, newvars []int) (Replacer, error) {
 	res := &replacer{}
 	if len(oldvars) != len(newvars) {
 		return nil, fmt.Errorf("unmatched length of slices")

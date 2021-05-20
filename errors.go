@@ -10,7 +10,7 @@ import (
 )
 
 // Error returns the error status of the BDD.
-func (b *bdd) Error() string {
+func (b *BDD) Error() string {
 	if b.error == nil {
 		return ""
 	}
@@ -18,11 +18,11 @@ func (b *bdd) Error() string {
 }
 
 // Errored returns true if there was an error during a computation.
-func (b *bdd) Errored() bool {
+func (b *BDD) Errored() bool {
 	return b.error != nil
 }
 
-func (b *bdd) seterror(format string, a ...interface{}) Node {
+func (b *BDD) seterror(format string, a ...interface{}) Node {
 	if b.error != nil {
 		format = format + "; " + b.Error()
 		b.error = fmt.Errorf(format, a...)

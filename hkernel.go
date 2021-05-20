@@ -2,6 +2,8 @@
 //
 // MIT License
 
+// !build buddy
+
 package rudd
 
 import (
@@ -11,7 +13,7 @@ import (
 	"sync/atomic"
 )
 
-func (b *hudd) retnode(n int) Node {
+func (b *implementation) retnode(n int) Node {
 	if n < 0 || n > len(b.nodes) {
 		if _DEBUG {
 			log.Panicf("b.retnode(%d) not valid\n", n)
@@ -38,7 +40,7 @@ func (b *hudd) retnode(n int) Node {
 	return &x
 }
 
-func (b *hudd) makenode(level int32, low int, high int, refstack []int) (int, error) {
+func (b *implementation) makenode(level int32, low int, high int, refstack []int) (int, error) {
 	if _DEBUG {
 		b.uniqueAccess++
 	}
@@ -82,7 +84,7 @@ func (b *hudd) makenode(level int32, low int, high int, refstack []int) (int, er
 	return b.setnode(level, low, high, 0), err
 }
 
-func (b *hudd) gbc(refstack []int) {
+func (b *implementation) gbc(refstack []int) {
 	if _LOGLEVEL > 0 {
 		log.Println("starting GC")
 	}
@@ -142,7 +144,7 @@ func (b *hudd) gbc(refstack []int) {
 	}
 }
 
-func (b *hudd) noderesize() error {
+func (b *implementation) noderesize() error {
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
 	}
@@ -196,7 +198,7 @@ func (b *hudd) noderesize() error {
 	return errResize
 }
 
-func (b *hudd) markrec(n int) {
+func (b *implementation) markrec(n int) {
 	if n < 2 || b.ismarked(n) || (b.nodes[n].low == -1) {
 		return
 	}
@@ -205,7 +207,7 @@ func (b *hudd) markrec(n int) {
 	b.markrec(b.nodes[n].high)
 }
 
-func (b *hudd) unmarkall() {
+func (b *implementation) unmarkall() {
 	for k, v := range b.nodes {
 		if k < 2 || !b.ismarked(k) || (v.low == -1) {
 			continue

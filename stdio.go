@@ -40,11 +40,11 @@ func humanSize(b int, unit uintptr) string {
 
 // PrintSet outputs a textual representation of the BDD with root n to the
 // standard output. We print all the nodes in b if n is nil.
-func (b Set) Print(n ...Node) {
+func (b *BDD) Print(n ...Node) {
 	b.print(os.Stdout, n...)
 }
 
-func (b Set) print(w io.Writer, n ...Node) {
+func (b *BDD) print(w io.Writer, n ...Node) {
 	if mesg := b.Error(); mesg != "" {
 		fmt.Fprintf(w, "Error: %s\n", mesg)
 		return
@@ -89,7 +89,7 @@ func print_set(w io.Writer, nodes [][4]int) {
 
 // PrintDot prints a graph-like description of the BDD with roots in n using the
 // DOT format; or the whole Set if n is missing.
-func (b Set) PrintDot(filename string, n ...Node) error {
+func (b *BDD) PrintDot(filename string, n ...Node) error {
 	var out *os.File
 	var err error
 	if filename == "-" {

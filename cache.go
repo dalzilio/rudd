@@ -10,6 +10,21 @@ import (
 	"unsafe"
 )
 
+// Hash functions
+
+func _TRIPLE(a, b, c, len int) int {
+	return int(_PAIR(c, _PAIR(a, b, len), len))
+}
+
+// _PAIR is a mapping function that maps (bijectively) a pair of integer (a, b)
+// into a unique integer then cast it into a value in the interval [0..len)
+// using a modulo operation.
+func _PAIR(a, b, len int) int {
+	ua := uint64(a)
+	ub := uint64(b)
+	return int(((((ua + ub) * (ua + ub + 1)) / 2) + (ua)) % uint64(len))
+}
+
 // Hash value modifiers for replace/compose
 const cacheid_REPLACE int = 0x0
 
@@ -97,7 +112,7 @@ func (bc *data3ncache) reset() {
 
 // Setup and shutdown
 
-func (b *bdd) cacheinit(c *configs) {
+func (b *BDD) cacheinit(c *configs) {
 	size := 10000
 	if c.cachesize != 0 {
 		size = c.cachesize
@@ -117,7 +132,7 @@ func (b *bdd) cacheinit(c *configs) {
 	b.replacecache.init(size, c.cacheratio)
 }
 
-func (b *bdd) cachereset() {
+func (b *BDD) cachereset() {
 	b.applycache.reset()
 	b.itecache.reset()
 	b.quantcache.reset()
@@ -125,7 +140,7 @@ func (b *bdd) cachereset() {
 	b.replacecache.reset()
 }
 
-func (b *bdd) cacheresize(nodesize int) {
+func (b *BDD) cacheresize(nodesize int) {
 	b.applycache.resize(nodesize)
 	b.itecache.resize(nodesize)
 	b.quantcache.resize(nodesize)
@@ -139,7 +154,7 @@ func (b *bdd) cacheresize(nodesize int) {
 
 // quantset2cache takes a variable list, similar to the ones generated with
 // Makeset, and set the variables in the quantification cache.
-func (b *bdd) quantset2cache(n int) error {
+func (b *BDD) quantset2cache(n int) error {
 	if n < 2 {
 		b.seterror("Illegal variable (%d) in varset to cache", n)
 		return b.error

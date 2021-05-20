@@ -2,6 +2,8 @@
 //
 // MIT License
 
+// +build buddy
+
 package rudd
 
 import (
@@ -11,9 +13,10 @@ import (
 	"unsafe"
 )
 
-// buddy implements a Binary Decision Diagram using the data structures and
-// algorithms found in the BuDDy library.
-type buddy struct {
+// implementation is used with the build ta buddy and corresponds to Binary
+// Decision Diagrams based on the data structures and algorithms found in the
+// BuDDy library.
+type implementation struct {
 	nodes         []buddynode // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	freenum       int         // Number of free nodes
 	freepos       int         // First free node
@@ -36,31 +39,45 @@ type buddynode struct {
 	next   int   // Next index to check in case of a collision, 0 if last
 }
 
-func (b *buddy) ismarked(n int) bool {
+func (b *implementation) ismarked(n int) bool {
 	return (b.nodes[n].level & 0x200000) != 0
 }
 
-func (b *buddy) marknode(n int) {
+func (b *implementation) marknode(n int) {
 	b.nodes[n].level = b.nodes[n].level | 0x200000
 }
 
-func (b *buddy) unmarknode(n int) {
+func (b *implementation) unmarknode(n int) {
 	b.nodes[n].level = b.nodes[n].level & 0x1FFFFF
 }
 
-// Buddy initializes a new BDD implementing the algorithms in the BuDDy library,
-// where varnum is the number of variables in the BDD. You can specify optional
-// (conifguration) parameters, such as the size of the initial node table
-// (Nodesize) or the size for caches (Cachesize).
+// The hash function for nodes is #(level, low, high)
+
+func (b *implementation) ptrhash(n int) int {
+	return _TRIPLE(int(b.nodes[n].level), b.nodes[n].low, b.nodes[n].high, len(b.nodes))
+}
+
+func (b *implementation) nodehash(level int32, low, high int) int {
+	return _TRIPLE(int(level), low, high, len(b.nodes))
+}
+
+// New returns a new BDD based on the implementation selected with the build
+// tag; meaning the 'Hudd'-style BDD by default (based on the standard runtime
+// hashmap) or a 'BuDDy'-style BDD if tags buddy is set. Parameter varnum is the
+// number of variables in the BDD.
 //
-// The initial number of nodes is not critical since the table will be resized
-// whenever there are too few nodes left after a garbage collection. But it does
-// have some impact on the efficency of the operations.
-func Buddy(varnum int, options ...func(*configs)) Set {
-	b := &bdd{}
+// It is possible to set optional (configuration) parameters, such as the size
+// of the initial node table (Nodesize) or the size for caches (Cachesize),
+// using configs functions. The initial number of nodes is not critical since
+// the table will be resized whenever there are too few nodes left after a
+// garbage collection. But it does have some impact on the efficency of the
+// operations. We return a nil value if there is an error while creating the
+// BDD.
+func New(varnum int, options ...func(*configs)) (*BDD, error) {
+	b := &BDD{}
 	if (varnum < 1) || (varnum > int(_MAXVAR)) {
 		b.seterror("bad number of variable (%d)", varnum)
-		return Set{b}
+		return nil, b.error
 	}
 	config := makeconfigs(varnum)
 	for _, f := range options {
@@ -75,7 +92,7 @@ func Buddy(varnum int, options ...func(*configs)) Set {
 	b.refstack = make([]int, 0, 2*varnum+4)
 	b.initref()
 	b.error = nil
-	impl := &buddy{}
+	impl := implementation{}
 	impl.minfreenodes = config.minfreenodes
 	impl.maxnodeincrease = config.maxnodeincrease
 	nodesize := bdd_prime_gte(config.nodesize)
@@ -115,14 +132,14 @@ func Buddy(varnum int, options ...func(*configs)) Set {
 		v0, _ := impl.makenode(int32(k), 0, 1, nil)
 		if v0 < 0 {
 			b.seterror("cannot allocate new variable %d in setVarnum", k)
-			return Set{b}
+			return nil, b.error
 		}
 		impl.nodes[v0].refcou = _MAXREFCOUNT
 		b.pushref(v0)
 		v1, _ := impl.makenode(int32(k), 1, 0, nil)
 		if v1 < 0 {
 			b.seterror("cannot allocate new variable %d in setVarnum", k)
-			return Set{b}
+			return nil, b.error
 		}
 		impl.nodes[v1].refcou = _MAXREFCOUNT
 		b.popref(1)
@@ -130,26 +147,26 @@ func Buddy(varnum int, options ...func(*configs)) Set {
 	}
 	b.implementation = impl
 	b.cacheinit(config)
-	return Set{b}
+	return b, nil
 }
 
-func (b *buddy) size() int {
+func (b *implementation) size() int {
 	return len(b.nodes)
 }
 
-func (b *buddy) level(n int) int32 {
+func (b *implementation) level(n int) int32 {
 	return b.nodes[n].level
 }
 
-func (b *buddy) low(n int) int {
+func (b *implementation) low(n int) int {
 	return b.nodes[n].low
 }
 
-func (b *buddy) high(n int) int {
+func (b *implementation) high(n int) int {
 	return b.nodes[n].high
 }
 
-func (b *buddy) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
+func (b *implementation) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
 	for _, v := range n {
 		b.markrec(*v)
 	}
@@ -173,7 +190,7 @@ func (b *buddy) allnodesfrom(f func(id, level, low, high int) error, n []Node) e
 	return nil
 }
 
-func (b *buddy) allnodes(f func(id, level, low, high int) error) error {
+func (b *implementation) allnodes(f func(id, level, low, high int) error) error {
 	if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
 		return err
 	}
@@ -191,7 +208,7 @@ func (b *buddy) allnodes(f func(id, level, low, high int) error) error {
 }
 
 // Stats returns information about the BDD
-func (b *buddy) stats() string {
+func (b *implementation) stats() string {
 	res := fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
 	res += fmt.Sprintf("Produced:   %d\n", b.produced)
 	r := (float64(b.freenum) / float64(len(b.nodes))) * 100

@@ -8,5 +8,3 @@ package rudd
 
 const _DEBUG bool = false
 const _LOGLEVEL int = 0
-
-func (b *buddy) logTable() {}
