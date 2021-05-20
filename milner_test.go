@@ -155,7 +155,7 @@ func TestMilner80(t *testing.T) {
 func BenchmarkMilner(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner_system(500000, 150, true); err != nil {
+		if _, _, err := milner_system(1000000, 150, true); err != nil {
 			b.Error(err)
 		}
 	}

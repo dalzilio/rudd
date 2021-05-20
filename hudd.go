@@ -113,6 +113,7 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 		refcou: _MAXREFCOUNT,
 	}
 	impl.freepos = 2
+	impl.freenum = len(impl.nodes) - 2
 	for k := 0; k < config.varnum; k++ {
 		v0, _ := impl.makenode(int32(k), 0, 1, nil)
 		if v0 < 0 {
