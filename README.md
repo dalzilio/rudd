@@ -5,15 +5,11 @@
   <a href="https://github.com/dalzilio/rudd">
     <img src="./docs/rudd1.png" alt="Logo" width="280">
   </a>
-
-  <p align="center">
-   RuDD,a library for Binary Decision Diagrams in Go.
-    <br />
-    <a href="https://github.com/dalzilio/rudd#features"><strong>see what's new »</strong></a>
-    <br />
-    <!-- <a href="https://github.com/dalzilio/mcc">View Demo</a> -->
-  </p>
 </p>
+
+# RuDD [![Go Report Card](https://goreportcard.com/badge/github.com/dalzilio/rudd)](https://goreportcard.com/report/github.com/dalzilio/rudd) [![GoDoc](https://godoc.org/github.com/dalzilio/rudd?status.svg)](https://godoc.org/github.com/dalzilio/rudd) [![Release](https://img.shields.io/github/v/release/dalzilio/rudd)](https://github.com/dalzilio/rudd/releases)
+
+RuDD is a library for Binary Decision Diagrams written in pure Go.
 
 ## About
 
@@ -45,10 +41,6 @@ by the Go runtime. Unlike MuDDy, we do not provide an interface, but a genuine
 reimplementation of BuDDy. As a consequence, we do not suffer from FFI overheads
 when calling from Go into C, which is one of the major pain points of working
 with Go.  
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/dalzilio/rudd)](https://goreportcard.com/report/github.com/dalzilio/rudd)
-[![GoDoc](https://godoc.org/github.com/dalzilio/rudd?status.svg)](https://godoc.org/github.com/dalzilio/rudd)
-[![Release](https://img.shields.io/github/v/release/dalzilio/rudd)](https://github.com/dalzilio/rudd/releases)
 
 ## Installation
 
@@ -82,6 +74,13 @@ to see whether we can replicate this experience in Go. Our first experiments
 show very promising results, but we are still lacking a serious study of the
 performances of our library.
 
+In the future, we plan to add new features to RuDD and to optimize some of its
+internals. For instance with  better  caching strategies or with the use of
+concurrency features. It means that the API could evolve in future releases but
+that no functions should disappear or change significantly.
+
+## Why this name
+
 The library is named after a fresh water fish, the [common
 rudd](https://en.wikipedia.org/wiki/Common_rudd) (*Scardinius
 erythrophthalmus*), or "gardon rouge" in French, that is stronger and more
@@ -89,11 +88,6 @@ resistant that the common roach, with which it is often confused. While it is
 sometimes used as bait, its commercial interest is minor. This is certainly a
 fitting description for our code ! It is also a valid English word ending with
 DD, which is enough to justify our choice.
-
-In the future, we plan to add new features to RuDD and to optimize some of its
-internals. For instance with  better  caching strategies. It means that the API
-could evolve in future releases but that no functions should disappear or change
-significantly.
 
 ## References
 
@@ -135,7 +129,7 @@ import (
 func main() {
   // create a new BDD with 6 variables, 10 000 nodes and a cache size of 5 000 (initially),
   // with an implementation based on the BuDDY approach
-  bdd := rudd.Buddy(6, 10000, 5000)
+  bdd := rudd.New(6, Nodesize(10000), Cachesize(5000))
   // n1 == x2 & x3 & x5
   n1 := bdd.Makeset([]int{2, 3, 5})
   // n2 == x1 | !x3 | x4
