@@ -3,7 +3,7 @@
 
 <p align="center">
   <a href="https://github.com/dalzilio/rudd">
-    <img src="./docs/rudd1.png" alt="Logo" width="280">
+    <img src="./docs/rudd1.png" alt="Logo" width="320">
   </a>
 </p>
 
@@ -16,9 +16,30 @@ RuDD is a library for Binary Decision Diagrams written in pure Go.
 RuDD is a Binary Decision Diagram (BDD) library written in pure Go, without the
 need for CGo or any other dependencies. A [BDD](https://en.wikipedia.org/wiki/Binary_decision_diagram) is a data structure
 used to efficiently represent Boolean functions or, equivalently, sets of
-Boolean vectors. It has nothing to do with Behaviour Driven Development testing.
+Boolean vectors.
 
-For the most part, RuDD is a direct translation of the
+It has nothing to do with Behaviour Driven Development testing!
+
+## Specific use of Go build tags
+
+We provide two possible implementations for BDD that can be selected using build
+tags. The rationale for this unorthodox use of build tags is to avoid the use of
+interfaces, and therefore dynamic dispatch, as well as to favor some automatic
+compiler optimizations (such as code inlining).
+
+Our default implementation (without any build tags) use a standard Go runtime
+hashmap to encode a "unicity table".
+
+When building your executable with the build tag `buddy` (as in `go build -tags
+buddy mycmd`) the API will switch to an implementation that is very close to the
+one of the BuDDy library; based on a specialized data-structure that mix a
+dynamic array with a hash table.
+
+To get access to better statistics about caches and garbage collection, as well as to unlock logging of some operations, you can also compile your executable with the build tag `debug`. 
+
+## Relation with BuDDy and MuDDy
+
+For the most part, RuDD is a direct translation in Go of the
 [BuDDy](http://buddy.sourceforge.net/manual/) C-library developed by Jorn
 Lind-Nielsen. You can find a high-level description of the algorithms and
 data-structures used in this project by looking at ["An Introduction To Binary
@@ -27,11 +48,16 @@ Report also distributed as part of the BuDDy distribution. The adaptation was
 made easy by the simplicity of its architecture  (in a good sense) and the
 legibility of its code.
 
-In many places, the source code of RuDD is an almost line-by-line copy of BuDDy
+In many places, the code of RuDD is an almost line-by-line copy of BuDDy
 (including reusing part of the same comments for documenting the code), with a
-few adaptations to follow some of Go best practices; we even implemented the
-same examples than in the BuDDy distribution for benchmarks and regression
-testing.
+few adaptations to follow some of Go best practices; we even implement the same
+examples than in the BuDDy distribution for benchmarks and regression testing.
+
+BuDDy is a mature software library, that has been used on several projects, with
+performances on par with more complex libraries, such as
+[CUDD](https://davidkebo.com/cudd). You can find a comparative study of the
+performances for several BDD libraries in
+[\[DHJ+2015\]](https://www.tvandijk.nl/pdf/2015setta.pdf).
 
 Like with [MuDDy](https://github.com/kfl/muddy), a ML interface to BuDDy, we
 piggyback on the garbage collection mechanism offered by our host language. We
@@ -41,6 +67,17 @@ by the Go runtime. Unlike MuDDy, we do not provide an interface, but a genuine
 reimplementation of BuDDy. As a consequence, we do not suffer from FFI overheads
 when calling from Go into C, which is one of the major pain points of working
 with Go.  
+
+Experiences have shown that there is no significant loss of performance when
+using BuDDy from a functional language with garbage collection, compared to
+using C or C++
+[\[L09\]](https://link.springer.com/content/pdf/10.1007%2F978-3-642-03034-5_3.pdf).
+For example, we use MuDDy in the tedd model-checker provided with
+[Tina](http://projects.laas.fr/tina/) (together with other libraries for dealing
+with multi-valued decision diagrams). One of our motivations in this project is
+to see whether we can replicate this experience in Go. Our first experiments
+show very promising results, but we are still lacking a serious study of the
+performances of our library.
 
 ## Installation
 
@@ -56,23 +93,6 @@ tools. At the moment, we provide only a subset of the functionalities defined in
 BuDDy, which is enough for our goals. In particular, we do not provide any
 method for the dynamic reordering of variables. We also lack support for Finite
 Domain Blocks (`fdd`) and Boolean Vectors (`bvec`).
-
-BuDDy is a mature software library, that has been used on several projects, with
-performances on par with more complex libraries, such as
-[CUDD](https://davidkebo.com/cudd). You can find a comparative study of the
-performances for several BDD libraries in this paper
-[\[DHJ+2015\]](https://www.tvandijk.nl/pdf/2015setta.pdf).
-
-Experiences have shown that there is no significant loss of performance when
-using BuDDy from a functional language with garbage collection, compared to
-using C or C++
-[\[L09\]](https://link.springer.com/content/pdf/10.1007%2F978-3-642-03034-5_3.pdf).
-For example, we use MuDDy in the tedd model-checker provided with
-[Tina](http://projects.laas.fr/tina/) (together with other libraries for dealing
-with multi-valued decision diagrams). One of our motivations in this project is
-to see whether we can replicate this experience in Go. Our first experiments
-show very promising results, but we are still lacking a serious study of the
-performances of our library.
 
 In the future, we plan to add new features to RuDD and to optimize some of its
 internals. For instance with  better  caching strategies or with the use of
