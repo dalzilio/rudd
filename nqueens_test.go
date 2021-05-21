@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// nqueens_system computes solutions for the N-Queen chess problem and returns
+// nqueens computes solutions for the N-Queen chess problem and returns
 // the number of solutions. It builds a BDD with NxN variables corresponding to
 // the squares in the chess board like:
 //
@@ -25,8 +25,8 @@ import (
 //      . . . X
 //      X . . .
 //      . . X .
-func nqueens_system(N int) *big.Int {
-	bdd, _ := New(N*N, Nodesize(N*N*256), Cachesize(10000))
+func nqueens(N int) *big.Int {
+	bdd, _ := New(N*N, Nodesize(N*N*256), Cachesize(N*N*64), Cacheratio(30))
 	queen := bdd.True()
 	X := make([][]Node, N)
 	for i := range X {
@@ -98,7 +98,7 @@ func TestNQueens(t *testing.T) {
 		{10, 724},
 	}
 	for _, tt := range nqueensTests {
-		actual := nqueens_system(tt.N)
+		actual := nqueens(tt.N)
 		if actual.Cmp(big.NewInt(tt.expected)) != 0 {
 			t.Errorf("Buddy: Error in NQuens(%d), expected %d, actual %s", tt.N, tt.expected, actual)
 		}
@@ -107,6 +107,6 @@ func TestNQueens(t *testing.T) {
 
 func BenchmarkNQueens(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		nqueens_system(12)
+		nqueens(12)
 	}
 }

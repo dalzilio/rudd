@@ -74,10 +74,10 @@ func (b *BDD) Print(w io.Writer, n ...Node) {
 		fmt.Fprintln(w, err.Error())
 		return
 	}
-	print_set(w, nodes)
+	printSet(w, nodes)
 }
 
-func print_set(w io.Writer, nodes [][4]int) {
+func printSet(w io.Writer, nodes [][4]int) {
 	tw := tabwriter.NewWriter(w, 0, 0, 0, ' ', 0)
 	for _, n := range nodes {
 		if n[0] > 1 {
@@ -88,9 +88,9 @@ func print_set(w io.Writer, nodes [][4]int) {
 }
 
 // Dot  writes a graph-like description of the BDD with roots in n to an output
-// stream using the DOT format. The behavior of Dot is very similar to the one
-// of Print. In particular, we include all the active nodes of b if n is absent
-// (len(n) == 0).
+// stream using Graphviz's dot format. The behavior of Dot is very similar to
+// the one of Print. In particular, we include all the active nodes of b if n is
+// absent (len(n) == 0).
 func (b *BDD) Dot(w io.Writer, n ...Node) error {
 	if mesg := b.Error(); mesg != "" {
 		fmt.Fprintf(w, "Error: %s\n", mesg)

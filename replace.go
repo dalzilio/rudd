@@ -65,7 +65,7 @@ func (b *BDD) NewReplacer(oldvars, newvars []int) (Replacer, error) {
 	if _REPLACEID == (math.MaxInt32 >> 2) {
 		return nil, fmt.Errorf("too many replacers created")
 	}
-	res.id = (_REPLACEID << 2) | cacheid_REPLACE
+	res.id = (_REPLACEID << 2) | cacheidREPLACE
 	_REPLACEID++
 	varnum := b.Varnum()
 	support := make([]bool, varnum)

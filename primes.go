@@ -19,7 +19,7 @@ func hasEasyFactors(src int) bool {
 	return hasFactor(src, 3) || hasFactor(src, 5) || hasFactor(src, 7) || hasFactor(src, 11) || hasFactor(src, 13)
 }
 
-func bdd_prime_gte(src int) int {
+func primeGte(src int) int {
 	if src%2 == 0 {
 		src++
 	}
@@ -37,7 +37,7 @@ func bdd_prime_gte(src int) int {
 	}
 }
 
-func bdd_prime_lte(src int) int {
+func primeLte(src int) int {
 	if src == 0 {
 		return 1
 	}

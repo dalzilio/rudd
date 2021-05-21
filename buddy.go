@@ -70,7 +70,7 @@ func (b *tables) nodehash(level int32, low, high int) int {
 // of the initial node table (Nodesize) or the size for caches (Cachesize),
 // using configs functions. The initial number of nodes is not critical since
 // the table will be resized whenever there are too few nodes left after a
-// garbage collection. But it does have some impact on the efficency of the
+// garbage collection. But it does have some impact on the efficiency of the
 // operations. We return a nil value if there is an error while creating the
 // BDD.
 func New(varnum int, options ...func(*configs)) (*BDD, error) {
@@ -95,7 +95,7 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 	impl := &tables{}
 	impl.minfreenodes = config.minfreenodes
 	impl.maxnodeincrease = config.maxnodeincrease
-	nodesize := bdd_prime_gte(config.nodesize)
+	nodesize := primeGte(config.nodesize)
 	impl.nodes = make([]buddynode, nodesize)
 	for k := range impl.nodes {
 		impl.nodes[k] = buddynode{
@@ -170,16 +170,16 @@ func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) 
 	for _, v := range n {
 		b.markrec(*v)
 	}
-	if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
-		b.unmarkall()
-		return err
-	}
-	if err := f(1, int(b.nodes[1].level), 1, 1); err != nil {
-		b.unmarkall()
-		return err
-	}
+	// if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
+	// 	b.unmarkall()
+	// 	return err
+	// }
+	// if err := f(1, int(b.nodes[1].level), 1, 1); err != nil {
+	// 	b.unmarkall()
+	// 	return err
+	// }
 	for k := range b.nodes {
-		if k > 1 && b.ismarked(k) {
+		if b.ismarked(k) {
 			b.unmarknode(k)
 			if err := f(k, int(b.nodes[k].level), b.nodes[k].low, b.nodes[k].high); err != nil {
 				b.unmarkall()
@@ -191,12 +191,12 @@ func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) 
 }
 
 func (b *tables) allnodes(f func(id, level, low, high int) error) error {
-	if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
-		return err
-	}
-	if err := f(1, int(b.nodes[1].level), 1, 1); err != nil {
-		return err
-	}
+	// if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
+	// 	return err
+	// }
+	// if err := f(1, int(b.nodes[1].level), 1, 1); err != nil {
+	// 	return err
+	// }
 	for k, v := range b.nodes {
 		if v.low != -1 {
 			if err := f(k, int(v.level), v.low, v.high); err != nil {

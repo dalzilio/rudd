@@ -25,7 +25,7 @@ func Example_basic() {
 	// n3 == ∃ x2,x3,x5 . (n2 & x3)
 	n3 := bdd.AndExist(n1, n2, bdd.Ithvar(3))
 	// You can print the result or export a BDD in Graphviz's DOT format
-	log.Print(bdd.Stats())
+	log.Print("\n" + bdd.Stats())
 	fmt.Printf("Number of sat. assignments is %s\n", bdd.Satcount(n3))
 	// Output:
 	// Number of sat. assignments is 48
@@ -55,15 +55,20 @@ func Example_allsat() {
 // Allnodes, that counts the number of active nodes in the whole BDD.
 func Example_allnodes() {
 	bdd, _ := rudd.New(5)
-	bdd.AndExist(bdd.Makeset([]int{2, 3}),
+	n := bdd.AndExist(bdd.Makeset([]int{2, 3}),
 		bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
 		bdd.Ithvar(3))
 	acc := new(int)
-	bdd.Allnodes(func(id, level, low, high int) error {
+	count := func(id, level, low, high int) error {
 		*acc++
 		return nil
-	})
-	fmt.Printf("Number of active nodes in BDD is %d", *acc)
+	}
+	bdd.Allnodes(count)
+	fmt.Printf("Number of active nodes in BDD is %d\n", *acc)
+	*acc = 0
+	bdd.Allnodes(count, n)
+	fmt.Printf("Number of active nodes in node is %d", *acc)
 	// Output:
-	// Number of active nodes in BDD is 18
+	// Number of active nodes in BDD is 16
+	// Number of active nodes in node is 2
 }

@@ -44,7 +44,7 @@ func (b *tables) makenode(level int32, low int, high int, refstack []int) (int, 
 	if _DEBUG {
 		b.uniqueAccess++
 	}
-	// check whether childen are equal, in which case we can skip the node
+	// check whether children are equal, in which case we can skip the node
 	if low == high {
 		return low, nil
 	}
@@ -177,7 +177,6 @@ func (b *tables) noderesize() error {
 	tmp := b.nodes
 	b.nodes = make([]huddnode, nodesize)
 	copy(b.nodes, tmp)
-	tmp = nil
 
 	for n := oldsize; n < nodesize; n++ {
 		b.nodes[n].refcou = 0

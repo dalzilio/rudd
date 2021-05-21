@@ -6,9 +6,9 @@ package rudd
 
 type Operator int
 
-// Operator describe the potential (binary) operations available on an Apply.
-// Only the first four operators (from OPand to OPnand) can be used in AppEx.
 const (
+	// Operator describe the potential (binary) operations available on an Apply.
+	// Only the first four operators (from OPand to OPnand) can be used in AppEx.
 	OPand    Operator = iota // Boolean conjunction
 	OPxor                    // Exclusive or
 	OPor                     // Disjunction
@@ -19,7 +19,7 @@ const (
 	OPdiff                   // Difference
 	OPless                   // Set difference
 	OPinvimp                 // Reverse implication
-	op_not                   // Negation. The only unary operation. It should not be used in Apply
+	opnot                    // Negation. The only unary operation. It should not be used in Apply
 )
 
 var opnames = [12]string{
@@ -33,7 +33,7 @@ var opnames = [12]string{
 	OPdiff:   "diff",
 	OPless:   "less",
 	OPinvimp: "invimp",
-	op_not:   "not",
+	opnot:    "not",
 }
 
 func (op Operator) String() string {

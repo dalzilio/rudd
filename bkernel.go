@@ -128,7 +128,7 @@ func (b *tables) noderesize() error {
 	if (nodesize > b.maxnodesize) && (b.maxnodesize > 0) {
 		nodesize = b.maxnodesize
 	}
-	nodesize = bdd_prime_lte(nodesize)
+	nodesize = primeLte(nodesize)
 	if nodesize <= oldsize {
 		// b.seterror("Unable to grow size of BDD (%d nodes)", nodesize)
 		return errMemory
@@ -137,7 +137,6 @@ func (b *tables) noderesize() error {
 	tmp := b.nodes
 	b.nodes = make([]buddynode, nodesize)
 	copy(b.nodes, tmp)
-	tmp = nil
 
 	for n := 0; n < oldsize; n++ {
 		b.nodes[n].hash = 0
@@ -183,10 +182,13 @@ func (b *tables) gbc(refstack []int) {
 		log.Println("starting GC")
 	}
 
-	// We could  explictly ask the system to run its GC so that we can decrement
-	// the ref counts of Nodes that had an external reference. This is blocking.
-	// Frequent GC is time consuming, but with fewer GC we can experience more
-	// resizing events.
+	// We could  explicitly ask the system to run its GC so that we can
+	// decrement the ref counts of Nodes that had an external reference. This is
+	// blocking. Frequent GC is time consuming, but with fewer GC we can
+	// experience more resizing events.
+	//
+	// FIXME: maybe add a gotask that does a runtime GC after a few resizing
+	// and/or a fixed time if we have too many gbc
 	//
 	// runtime.GC()
 

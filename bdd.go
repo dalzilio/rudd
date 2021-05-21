@@ -144,10 +144,10 @@ var bddone Node = inode(1)
 
 var bddzero Node = inode(0)
 
-// BDD is the type of Binary Decision Diagrams. A BDD is a pointer to an
-// unexported (struct) type that encapsulates the internal states of a BDD; such
-// as a node table. We propose multiple implementations (two at the moment) all
-// based on approaches where we use integers as the key for Nodes.
+// BDD is the type of Binary Decision Diagrams. It abstracts and encapsulates
+// the internal states of a BDD; such as caches, or the internal node and
+// unicity tables for example. We propose multiple implementations (two at the
+// moment) all based on approaches where we use integers as the key for Nodes.
 type BDD struct {
 	varnum   int32    // Number of BDD variables.
 	varset   [][2]int // Set of variables used for Ithvar and NIthvar: we have a pair for each variable for its positive and negative occurrence
@@ -334,14 +334,14 @@ func (b *BDD) Equal(n1, n2 Node) bool {
 	return *n1 == *n2
 }
 
-// AndExists returns the "relational composition" of two nodes with respect to
+// AndExist returns the "relational composition" of two nodes with respect to
 // varset, meaning the result of (∃ varset . n1 & n2).
 func (b *BDD) AndExist(varset, n1, n2 Node) Node {
 	return b.AppEx(n1, n2, OPand, varset)
 }
 
 // True returns the constant true BDD (a node pointing to the value 1). Our
-// implementation ensures that this pointer is unique. Hence two succesive call
+// implementation ensures that this pointer is unique. Hence two successive call
 // to True should return the same node.
 func (b *BDD) True() Node {
 	return bddone

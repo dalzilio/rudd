@@ -251,7 +251,7 @@ func (b *BDD) apply(left int, right int) int {
 	return b.setapply(left, right, res)
 }
 
-// Ite, short for if-then-else operator, computes the BDD for the expression [(f
+// Ite (short for if-then-else operator) computes the BDD for the expression [(f
 // & g) | (!f & h)] more efficiently than doing the three operations separately.
 func (b *BDD) Ite(f, g, h Node) Node {
 	if b.checkptr(f) != nil {
@@ -272,17 +272,17 @@ func (b *BDD) Ite(f, g, h Node) Node {
 	return b.retnode(res)
 }
 
-// ite_low returns p if p is strictly higher than q or r, otherwise it returns
+// iteLow returns p if p is strictly higher than q or r, otherwise it returns
 // p.low. This is used in function ite to know which node to follow: we always
 // follow the smallest(s) nodes.
-func (b *BDD) ite_low(p, q, r int32, n int) int {
+func (b *BDD) iteLow(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
 	return b.low(n)
 }
 
-func (b *BDD) ite_high(p, q, r int32, n int) int {
+func (b *BDD) iteHigh(p, q, r int32, n int) int {
 	if (p > q) || (p > r) {
 		return n
 	}
@@ -331,8 +331,8 @@ func (b *BDD) ite(f, g, h int) int {
 	p := b.level(f)
 	q := b.level(g)
 	r := b.level(h)
-	low := b.pushref(b.ite(b.ite_low(p, q, r, f), b.ite_low(q, p, r, g), b.ite_low(r, p, q, h)))
-	high := b.pushref(b.ite(b.ite_high(p, q, r, f), b.ite_high(q, p, r, g), b.ite_high(r, p, q, h)))
+	low := b.pushref(b.ite(b.iteLow(p, q, r, f), b.iteLow(q, p, r, g), b.iteLow(r, p, q, h)))
+	high := b.pushref(b.ite(b.iteHigh(p, q, r, f), b.iteHigh(q, p, r, g), b.iteHigh(r, p, q, h)))
 	res := b.makenode(min3(p, q, r), low, high)
 	b.popref(2)
 	return b.setite(f, g, h, res)
@@ -355,7 +355,7 @@ func (b *BDD) Exist(n, varset Node) Node {
 		return n
 	}
 
-	b.quantcache.id = cacheid_EXIST
+	b.quantcache.id = cacheidEXIST
 	b.applycache.op = int(OPor)
 	b.initref()
 	b.pushref(*n)
@@ -416,7 +416,7 @@ func (b *BDD) AppEx(n1, n2 Node, op Operator, varset Node) Node {
 	b.applycache.op = int(OPor)
 	b.appexcache.op = int(op)
 	b.appexcache.id = (*varset << 2) | b.appexcache.op
-	b.quantcache.id = (b.appexcache.id << 3) | cacheid_APPEX
+	b.quantcache.id = (b.appexcache.id << 3) | cacheidAPPEX
 	b.initref()
 	b.pushref(*n1)
 	b.pushref(*n2)

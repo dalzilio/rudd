@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestIte_1(t *testing.T) {
+func TestIte(t *testing.T) {
 	bdd, _ := New(4, Nodesize(5000), Cachesize(1000))
 	n1 := bdd.Makeset([]int{0, 2, 3})
 	n2 := bdd.Makeset([]int{0, 3})
@@ -26,7 +26,7 @@ func TestIte_1(t *testing.T) {
 func TestOperations(t *testing.T) {
 	varnum := 4
 	bdd, _ := New(varnum, Nodesize(1000), Cachesize(1000))
-	test1_check := func(x Node) error {
+	check := func(x Node) error {
 		allsatBDD := x
 		allsatSumBDD := bdd.False()
 		// Calculate whole set of asignments and remove all assignments
@@ -70,22 +70,22 @@ func TestOperations(t *testing.T) {
 	nc := bdd.NIthvar(2)
 	nd := bdd.NIthvar(3)
 
-	test1_check(bdd.True())
+	check(bdd.True())
 
-	test1_check(bdd.False())
+	check(bdd.False())
 
 	// a & b | !a & !b
-	test1_check(bdd.Or(bdd.And(a, b), bdd.And(na, nb)))
+	check(bdd.Or(bdd.And(a, b), bdd.And(na, nb)))
 
 	// a & b | c & d
-	test1_check(bdd.Or(bdd.And(a, b), bdd.And(c, d)))
+	check(bdd.Or(bdd.And(a, b), bdd.And(c, d)))
 
 	// a & !b | a & !d | a & b & !c
-	test1_check(bdd.Or(bdd.And(a, nb), bdd.And(a, nd), bdd.And(a, b, nc)))
+	check(bdd.Or(bdd.And(a, nb), bdd.And(a, nd), bdd.And(a, b, nc)))
 
 	for i := 0; i < varnum; i++ {
-		test1_check(bdd.Ithvar(i))
-		test1_check(bdd.NIthvar(i))
+		check(bdd.Ithvar(i))
+		check(bdd.NIthvar(i))
 	}
 
 	set := bdd.True()
@@ -108,6 +108,6 @@ func TestOperations(t *testing.T) {
 			}
 		}
 
-		test1_check(set)
+		check(set)
 	}
 }

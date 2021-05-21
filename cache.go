@@ -26,14 +26,14 @@ func _PAIR(a, b, len int) int {
 }
 
 // Hash value modifiers for replace/compose
-const cacheid_REPLACE int = 0x0
+const cacheidREPLACE int = 0x0
 
 // const cacheid_COMPOSE int = 0x1
 // const cacheid_VECCOMPOSE int = 0x2
 
 // Hash value modifiers for quantification
-const cacheid_EXIST int = 0x0
-const cacheid_APPEX int = 0x3
+const cacheidEXIST int = 0x0
+const cacheidAPPEX int = 0x3
 
 // const cacheid_FORALL int = 0x1
 // const cacheid_UNIQUE int = 0x2
@@ -55,7 +55,7 @@ type data4ncache struct {
 }
 
 func (bc *data4ncache) init(size, ratio int) {
-	size = bdd_prime_gte(size)
+	size = primeGte(size)
 	bc.table = make([]data4n, size)
 	bc.ratio = ratio
 	bc.reset()
@@ -63,7 +63,7 @@ func (bc *data4ncache) init(size, ratio int) {
 
 func (bc *data4ncache) resize(size int) {
 	if bc.ratio > 0 {
-		size = bdd_prime_gte((size * bc.ratio) / 100)
+		size = primeGte((size * bc.ratio) / 100)
 		bc.table = make([]data4n, size)
 	}
 	bc.reset()
@@ -90,7 +90,7 @@ type data3n struct {
 }
 
 func (bc *data3ncache) init(size, ratio int) {
-	size = bdd_prime_gte(size)
+	size = primeGte(size)
 	bc.table = make([]data3n, size)
 	bc.ratio = ratio
 	bc.reset()
@@ -98,7 +98,7 @@ func (bc *data3ncache) init(size, ratio int) {
 
 func (bc *data3ncache) resize(size int) {
 	if bc.ratio > 0 {
-		size = bdd_prime_gte((size * bc.ratio) / 100)
+		size = primeGte((size * bc.ratio) / 100)
 		bc.table = make([]data3n, size)
 	}
 	bc.reset()
@@ -117,7 +117,7 @@ func (b *BDD) cacheinit(c *configs) {
 	if c.cachesize != 0 {
 		size = c.cachesize
 	}
-	size = bdd_prime_gte(size)
+	size = primeGte(size)
 	b.applycache = &applycache{}
 	b.applycache.init(size, c.cacheratio)
 	b.itecache = &itecache{}
@@ -206,7 +206,7 @@ func (bc *applycache) setapply(left, right, res int) int {
 
 func (bc *applycache) matchnot(n int) int {
 	entry := bc.table[n%len(bc.table)]
-	if entry.a == n && entry.c == int(op_not) {
+	if entry.a == n && entry.c == int(opnot) {
 		if _DEBUG {
 			bc.opHit++
 		}
@@ -221,7 +221,7 @@ func (bc *applycache) matchnot(n int) int {
 func (bc *applycache) setnot(n, res int) int {
 	bc.table[n%len(bc.table)] = data4n{
 		a:   n,
-		c:   int(op_not),
+		c:   int(opnot),
 		res: res,
 	}
 	return res

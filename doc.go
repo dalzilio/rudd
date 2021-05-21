@@ -16,8 +16,8 @@ the creation of multiple BDD with possibly different number of variables.
 
 Most operations over BDD return a Node; that is a pointer to a "vertex" in the
 BDD that includes a variable level, and the address of the low and high branch
-for this node. We use integer to represent the adress of Nodes, with the
-convention that 1 (respectively 0) is the adress of the constant function True
+for this node. We use integer to represent the address of Nodes, with the
+convention that 1 (respectively 0) is the address of the constant function True
 (respectively False).
 
 Use of build tags

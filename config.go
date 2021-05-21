@@ -24,10 +24,11 @@ func makeconfigs(varnum int) *configs {
 	return c
 }
 
-// Nodesize sets a preferred initial size for the node tables. The size of the
-// BDD can increase during computation. By default we create a table large
-// enough to include the two constants and the "variables" used in the call to
-// Ithvar and NIthvar.
+// Nodesize is a configuration option (function). Used as a parameter in New it
+// sets a preferred initial size for the node table. The size of the BDD can
+// increase during computation. By default we create a table large enough to
+// include the two constants and the "variables" used in the call to Ithvar and
+// NIthvar.
 func Nodesize(size int) func(*configs) {
 	return func(c *configs) {
 		if size >= 2*c.varnum+2 {
@@ -36,18 +37,20 @@ func Nodesize(size int) func(*configs) {
 	}
 }
 
-// Maxnodesize sets a limit to the number of nodes in the BDD. An operation
-// trying to raise the number of nodes above this limit will generate an error
-// and return a nil Node. The default value (0) means that there is no limit. In
-// which case allocation can panic if we exhaust all the available memory.
+// Maxnodesize is a configuration option (function). Used as a parameter in New
+// it sets a limit to the number of nodes in the BDD. An operation trying to
+// raise the number of nodes above this limit will generate an error and return
+// a nil Node. The default value (0) means that there is no limit. In which case
+// allocation can panic if we exhaust all the available memory.
 func Maxnodesize(size int) func(*configs) {
 	return func(c *configs) {
 		c.maxnodesize = size
 	}
 }
 
-// Maxnodeincrease sets a limit on the increase in size of the node table. Below
-// this limit we typically double the size of the node list each time we need to
+// Maxnodeincrease is a configuration option (function). Used as a parameter in
+// New it sets a limit on the increase in size of the node table. Below this
+// limit we typically double the size of the node list each time we need to
 // resize it. The default value is about a million nodes. Set the value to zero
 // to avoid imposing a limit.
 func Maxnodeincrease(size int) func(*configs) {
@@ -56,10 +59,11 @@ func Maxnodeincrease(size int) func(*configs) {
 	}
 }
 
-// Minfreenodes sets the ratio of free nodes (%) that has to be left after a
-// Garbage Collection event. When there is not enough free nodes in the BDD, we
-// try reclaiming unused nodes. With a ratio of, say 25, we resize the table if
-// the number a free nodes is less than 25% of the capacity of the table (see
+// Minfreenodes is a configuration option (function). Used as a parameter in New
+// it sets the ratio of free nodes (%) that has to be left after a Garbage
+// Collection event. When there is not enough free nodes in the BDD, we try
+// reclaiming unused nodes. With a ratio of, say 25, we resize the table if the
+// number a free nodes is less than 25% of the capacity of the table (see
 // Maxnodesize and Maxnodeincrease). The default value is 20%.
 func Minfreenodes(ratio int) func(*configs) {
 	return func(c *configs) {
@@ -67,21 +71,22 @@ func Minfreenodes(ratio int) func(*configs) {
 	}
 }
 
-// Cachesize sets the initial number of entries in the operation caches. The
-// default value is 10 000. Typical values for nodesize are 10 000 nodes for
-// small test examples and up to 1 000 000 nodes for large examples. See also
-// the Cacheratio config.
+// Cachesize is a configuration option (function). Used as a parameter in New it
+// sets the initial number of entries in the operation caches. The default value
+// is 10 000. Typical values for nodesize are 10 000 nodes for small test
+// examples and up to 1 000 000 nodes for large examples. See also the
+// Cacheratio config.
 func Cachesize(size int) func(*configs) {
 	return func(c *configs) {
 		c.cachesize = size
 	}
 }
 
-// Cacheratio sets a "cache ratio" (%) so that caches can grow each time we
-// resize the node table. With a cache ratio of r, we have r available entries
-// in the cache for every 100 slots in the node table. (A typical value for the
-// cache ratio is 25% or 20%). The default value (0) means that the cache size
-// never grows.
+// Cacheratio is a configuration option (function). Used as a parameter in New
+// it sets a "cache ratio" (%) so that caches can grow each time we resize the
+// node table. With a cache ratio of r, we have r available entries in the cache
+// for every 100 slots in the node table. (A typical value for the cache ratio
+// is 25% or 20%). The default value (0) means that the cache size never grows.
 func Cacheratio(ratio int) func(*configs) {
 	return func(c *configs) {
 		c.cacheratio = ratio
