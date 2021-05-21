@@ -27,7 +27,8 @@ const _MAXVAR int32 = 0x1FFFFF
 const _MAXREFCOUNT int32 = 0x3FF
 
 // _DEFAULTMAXNODEINC is the default value for the maximal increase in the
-// number of nodes during a resize. It is approx. a million nodes (1 048 576).
+// number of nodes during a resize. It is approx. one million nodes (1 048 576)
+// (could be interesting to change it to 1 << 23 = 8 388 608).
 const _DEFAULTMAXNODEINC int = 1 << 20
 
 var errMemory = errors.New("unable to free memory or resize BDD")

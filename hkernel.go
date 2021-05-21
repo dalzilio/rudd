@@ -99,11 +99,11 @@ func (b *tables) gbc(refstack []int) {
 			setfinalizers:    int(b.gcstat.setfinalizers),
 			calledfinalizers: int(b.gcstat.calledfinalizers),
 		})
-		b.gcstat.setfinalizers = 0
-		b.gcstat.calledfinalizers = 0
 		if _LOGLEVEL > 0 {
 			log.Printf("runtime.GC() reclaimed %d references\n", b.gcstat.calledfinalizers)
 		}
+		b.gcstat.setfinalizers = 0
+		b.gcstat.calledfinalizers = 0
 	} else {
 		b.gcstat.history = append(b.gcstat.history, gcpoint{
 			nodes:     len(b.nodes),

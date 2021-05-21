@@ -14,10 +14,10 @@ import (
 // reachable state of a system composed of N cyclers, with an initial BDD size
 // of size. For this system, we have an anlytical formula to compute the size of
 // the state space.
-func milner(fast bool, varnum int, options ...func(*configs)) (*BDD, Node, error) {
+func milner(tb testing.TB, fast bool, varnum int, options ...func(*configs)) (*BDD, Node) {
 	bdd, err := New(varnum*6, options...)
 	if err != nil {
-		return nil, nil, err
+		tb.Error(err)
 	}
 	c := make([]Node, varnum)
 	cp := make([]Node, varnum)
@@ -43,7 +43,7 @@ func milner(fast bool, varnum int, options ...func(*configs)) (*BDD, Node, error
 	}
 	replacer, err := bdd.NewReplacer(pvar, nvar)
 	if err != nil {
-		return bdd, nil, err
+		tb.Error(err)
 	}
 
 	// We create a BDD for the initial state of Milner's cyclers.
@@ -88,20 +88,17 @@ func milner(fast bool, varnum int, options ...func(*configs)) (*BDD, Node, error
 			break
 		}
 	}
-	return bdd, R, nil
+	if _LOGLEVEL > 0 {
+		tb.Log("\n", bdd.Stats())
+	}
+	return bdd, R
 }
 
 func TestMilnerSlow(t *testing.T) {
 	for _, N := range []int{4, 5, 7, 11} {
 		// we choose a small size to stress test garbage collection
-		fast, Rfast, err := milner(true, N, Nodesize(100), Cachesize(25), Cacheratio(25))
-		if err != nil {
-			t.Error(err)
-		}
-		slow, Rslow, err := milner(false, N, Nodesize(100), Cachesize(25), Cacheratio(25))
-		if err != nil {
-			t.Error(err)
-		}
+		fast, Rfast := milner(t, true, N, Nodesize(100), Cachesize(25), Cacheratio(25))
+		slow, Rslow := milner(t, false, N, Nodesize(100), Cachesize(25), Cacheratio(25))
 		expected := big.NewInt(int64(N))
 		pow := big.NewInt(0)
 		pow.SetBit(pow, 4*N+1, 1)
@@ -114,13 +111,10 @@ func TestMilnerSlow(t *testing.T) {
 	}
 }
 
-func TestMilner(t *testing.T) {
+func Testmilner(t *testing.T) {
 	for _, N := range []int{16, 20, 30, 50} {
 		// we choose a small size to stress test garbage collection
-		bdd, R, err := milner(true, N, Nodesize(100000))
-		if err != nil {
-			t.Error(err)
-		}
+		bdd, R := milner(t, true, N, Nodesize(100000))
 		expected := big.NewInt(int64(N))
 		pow := big.NewInt(0)
 		pow.SetBit(pow, 4*N+1, 1)
@@ -135,10 +129,7 @@ func TestMilner(t *testing.T) {
 func TestMilner80(t *testing.T) {
 	N := 80
 	tt := func(buddy bool) {
-		bdd, R, err := milner(true, N, Nodesize(1000000), Cachesize(250000), Cacheratio(25))
-		if err != nil {
-			t.Error(err)
-		}
+		bdd, R := milner(t, true, N, Nodesize(1000000), Cachesize(250000), Cacheratio(25))
 		expected := big.NewInt(int64(N))
 		pow := big.NewInt(0)
 		pow.SetBit(pow, 4*N+1, 1)
@@ -152,20 +143,16 @@ func TestMilner80(t *testing.T) {
 	tt(false)
 }
 
-func BenchmarkMilner(b *testing.B) {
+func BenchmarkMilner150(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner(true, 150, Nodesize(1000000), Cachesize(250000), Cacheratio(25)); err != nil {
-			b.Error(err)
-		}
+		milner(b, true, 150, Nodesize(1000000), Cachesize(250000), Cacheratio(25))
 	}
 }
 
-func BenchmarkMilner500(b *testing.B) {
+func BenchmarkMilner300(b *testing.B) {
 	// run the milner_system function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, _, err := milner(true, 150, Nodesize(1000000), Cachesize(250000), Cacheratio(25)); err != nil {
-			b.Error(err)
-		}
+		milner(b, true, 300, Nodesize(1000000), Cachesize(250000), Cacheratio(25), Maxnodeincrease(1<<23))
 	}
 }

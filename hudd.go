@@ -263,12 +263,11 @@ func (b *tables) allnodes(f func(id, level, low, high int) error) error {
 // stats returns information about the implementation
 func (b *tables) stats() string {
 	res := "Impl.:      Hudd\n"
-	res += fmt.Sprintf("Allocated:  %d\n", len(b.nodes))
+	res += fmt.Sprintf("Allocated:  %d (%s)\n", len(b.nodes), humanSize(len(b.nodes), unsafe.Sizeof(huddnode{})))
 	res += fmt.Sprintf("Produced:   %d\n", b.produced)
 	r := (float64(b.freenum) / float64(len(b.nodes))) * 100
-	res += fmt.Sprintf("Free:       %d  (%.3g %%)\n", b.freenum, r)
-	res += fmt.Sprintf("Used:       %d  (%.3g %%)\n", len(b.nodes)-b.freenum, (100.0 - r))
-	res += fmt.Sprintf("Size:       %s\n", humanSize(len(b.nodes), unsafe.Sizeof(huddnode{})))
+	res += fmt.Sprintf("Free:       %d (%.3g %%)\n", b.freenum, r)
+	res += fmt.Sprintf("Used:       %d (%.3g %%)\n", len(b.nodes)-b.freenum, (100.0 - r))
 	res += "==============\n"
 	res += fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history))
 	if _DEBUG {
