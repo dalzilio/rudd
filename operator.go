@@ -4,22 +4,24 @@
 
 package rudd
 
+// Operator describe the potential (binary) operations available on an Apply.
+// Only the first four operators (from OPand to OPnand) can be used in AppEx.
 type Operator int
 
 const (
-	// Operator describe the potential (binary) operations available on an Apply.
-	// Only the first four operators (from OPand to OPnand) can be used in AppEx.
-	OPand    Operator = iota // Boolean conjunction
-	OPxor                    // Exclusive or
-	OPor                     // Disjunction
-	OPnand                   // Negation of and
-	OPnor                    // Negation of or
-	OPimp                    // Implication
-	OPbiimp                  // Equivalence
-	OPdiff                   // Difference
-	OPless                   // Set difference
-	OPinvimp                 // Reverse implication
-	opnot                    // Negation. The only unary operation. It should not be used in Apply
+	OPand Operator = iota
+	OPxor
+	OPor
+	OPnand
+	OPnor
+	OPimp
+	OPbiimp
+	OPdiff
+	OPless
+	OPinvimp
+	// opnot, for negation, is the only unary operation. It should not be used
+	// in Apply
+	opnot
 )
 
 var opnames = [12]string{
