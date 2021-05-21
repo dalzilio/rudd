@@ -28,7 +28,7 @@ func (b *BDD) Scanset(n Node) []int {
 	return res
 }
 
-// Makeset returns a node corresponding to the conjunction of all the variable
+// Makeset returns a node corresponding to the conjunction of all the variables
 // in varset, in their positive form. It is such that scanset(Makeset(a)) == a.
 // It returns False and sets the error condition in b if one of the variables is
 // outside the scope of the BDD (see documentation for function *Ithvar*).
@@ -46,26 +46,44 @@ func (b *BDD) Makeset(varset []int) Node {
 }
 
 // Makecube returns a node corresponding to the conjunction (the cube) of all
-// the variable in the Boolean slice cube, where variable xk occurs in positive
-// form in the result if cube[k] is true and in negative form otherwise. It
-// returns nil and sets the error condition if the length of cube is different
-// from Varnum. This method is more efficient than using Apply and And
-// successively.
-func (b *BDD) Makecube(cube []bool) Node {
+// the variables in varset. Unlike with Makeset, variable varset[k] occurs in
+// positive form in the result if polarity[k] is true, and in negative form if
+// false. It returns nil and sets the error condition if the length of varset
+// and polarity are different. As a special case, when varset is empty
+// (len(varset) == 0), we consider that polarity operates over all the variables
+// in b (and therefore we expect that len(polarity) == Varnum). This method is
+// more efficient than using Apply and And successively.
+func (b *BDD) Makecube(varset []int, polarity []bool) Node {
 	res := 1
-	if len(cube) != int(b.varnum) {
-		return b.seterror("wrong size of cube in Makecube")
+	if len(varset) == 0 {
+		if len(polarity) != int(b.varnum) {
+			return b.seterror("wrong size for polarity in Makecube")
+		}
+		b.initref()
+		for k := len(polarity) - 1; k >= 0; k-- {
+			if polarity[k] {
+				res = b.makenode(int32(k), 0, res)
+			} else {
+				res = b.makenode(int32(k), res, 0)
+			}
+			b.pushref(res)
+		}
+		b.popref(len(polarity))
+		return b.retnode(res)
+	}
+	if len(varset) != len(polarity) {
+		return b.seterror("wrong size for slices in Makecube")
 	}
 	b.initref()
-	for k := len(cube) - 1; k >= 0; k-- {
-		if cube[k] {
+	for k := len(polarity) - 1; k >= 0; k-- {
+		if polarity[k] {
 			res = b.makenode(int32(k), 0, res)
 		} else {
 			res = b.makenode(int32(k), res, 0)
 		}
 		b.pushref(res)
 	}
-	b.popref(len(cube))
+	b.popref(len(polarity))
 	return b.retnode(res)
 }
 

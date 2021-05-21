@@ -111,7 +111,7 @@ func TestMilnerSlow(t *testing.T) {
 	}
 }
 
-func Testmilner(t *testing.T) {
+func TestMilner(t *testing.T) {
 	for _, N := range []int{16, 20, 30, 50} {
 		// we choose a small size to stress test garbage collection
 		bdd, R := milner(t, true, N, Nodesize(100000))
