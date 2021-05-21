@@ -28,11 +28,10 @@ func (b *BDD) Scanset(n Node) []int {
 	return res
 }
 
-// Makeset returns a node corresponding to the conjunction (the cube) of all the
-// variable in varset, in their positive form. It is such that
-// scanset(Makeset(a)) == a. It returns False and sets the error condition in b
-// if one of the variables is outside the scope of the BDD (see documentation
-// for function *Ithvar*).
+// Makeset returns a node corresponding to the conjunction of all the variable
+// in varset, in their positive form. It is such that scanset(Makeset(a)) == a.
+// It returns False and sets the error condition in b if one of the variables is
+// outside the scope of the BDD (see documentation for function *Ithvar*).
 func (b *BDD) Makeset(varset []int) Node {
 	res := bddone
 	for _, level := range varset {
@@ -44,6 +43,30 @@ func (b *BDD) Makeset(varset []int) Node {
 		res = tmp
 	}
 	return res
+}
+
+// Makecube returns a node corresponding to the conjunction (the cube) of all
+// the variable in the Boolean slice cube, where variable xk occurs in positive
+// form in the result if cube[k] is true and in negative form otherwise. It
+// returns nil and sets the error condition if the length of cube is different
+// from Varnum. This method is more efficient than using Apply and And
+// successively.
+func (b *BDD) Makecube(cube []bool) Node {
+	res := 1
+	if len(cube) != int(b.varnum) {
+		return b.seterror("wrong size of cube in Makecube")
+	}
+	b.initref()
+	for k := len(cube) - 1; k >= 0; k-- {
+		if cube[k] {
+			res = b.makenode(int32(k), 0, res)
+		} else {
+			res = b.makenode(int32(k), res, 0)
+		}
+		b.pushref(res)
+	}
+	b.popref(len(cube))
+	return b.retnode(res)
 }
 
 // Not returns the negation of the expression corresponding to node n; it
