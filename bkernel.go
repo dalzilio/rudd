@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 )
 
-// retnode creates a Node for external use and sets a finalizer on it so that we
-// can reclaim the ressource during GC.
-func (b *tables) retnode(n int) Node {
+// Retnode is a kernel function of the BDD package. Use it at your own risk.
+// Retnode returns a valid node from the value returned by a call to Makenode.
+func (b *tables) Retnode(n int) Node {
 	if n < 0 || n > len(b.nodes) {
 		if _DEBUG {
 			log.Panicf("unexpected error; b.retnode(%d) not valid\n", n)

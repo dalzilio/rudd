@@ -162,12 +162,20 @@ func (b *BDD) Varnum() int {
 	return int(b.varnum)
 }
 
-func (b *BDD) makenode(level int32, low, high int) int {
+// Makenode is a kernel function of the BDD package. Use it at your own risk.
+// Makenode returns a node corresponding to the tuple (level, low, high) if it
+// exist or creates a new one in the BDD. You can create a node from the value
+// returned by Makenode using function Retnode.
+func (b *BDD) Makenode(level int32, low, high int) int {
 	res, err := b.tables.makenode(level, low, high, b.refstack)
 	if err == nil {
 		return res
 	}
 	if err == errReset {
+		// FIXME: we do not need to invalidate the cache for a reset when we use
+		// the Hudd implementation because the hash does not change. On the
+		// other hand we can reuse the index of nodes that have been reclaimed
+		// during the GC, but that correspond to other values now.
 		b.cachereset()
 		return res
 	}
@@ -187,19 +195,35 @@ type caches struct {
 	*replacecache // Cache for Replace results
 }
 
-// initref is part of three private functions to manipulate the refstack; used
-// to prevent nodes that are currently being built (e.g. transient nodes built
-// during an apply) to be reclaimed during GC.
-func (b *BDD) initref() {
+// Initref is a kernel function of the BDD package. Use it at your own risk.
+// Initref is part of three functions used to manipulate a private (ref) stack;
+// used to prevent transient nodes that are currently being built to be
+// reclaimed during a memory management operation. You should always start with
+// Initref in a function that creates new nodes.
+func (b *BDD) Initref() {
 	b.refstack = b.refstack[:0]
 }
 
-func (b *BDD) pushref(n int) int {
+// Pushref is a kernel function of the BDD package. Use it at your own risk.
+// Pushref is part of three functions used to manipulate a private (ref) stack;
+// used to prevent transient nodes that are currently being built to be
+// reclaimed during a memory management operation. You should call Pushref on
+// the result returned by a call to Makenode when implementing your own BDD
+// operation.
+func (b *BDD) Pushref(n int) int {
 	b.refstack = append(b.refstack, n)
 	return n
 }
 
-func (b *BDD) popref(a int) {
+// Popref is a kernel function of the BDD package. Use it at your own risk.
+// Popref is part of three functions used to manipulate a private (ref) stack;
+// used to prevent transient nodes that are currently being built to be
+// reclaimed during a memory management operation. You can call Popref at the
+// end of your BDD operation. The value of parameter a should be equal to the
+// number of Pushref call since you used Initref (the call will panic if a is
+// too big). The call to Popref is not mandatory and could be replaced by a call
+// to Initref.
+func (b *BDD) Popref(a int) {
 	b.refstack = b.refstack[:len(b.refstack)-a]
 }
 
@@ -277,7 +301,7 @@ func (b *BDD) Low(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Illegal access to node %d in call to Low", n)
 	}
-	return b.retnode(b.low(*n))
+	return b.Retnode(b.low(*n))
 }
 
 // High returns the true (or high) branch of a BDD. We return nil and set the
@@ -286,7 +310,7 @@ func (b *BDD) High(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Illegal access to node %d in call to High", n)
 	}
-	return b.retnode(b.high(*n))
+	return b.Retnode(b.high(*n))
 }
 
 // And returns the logical 'and' of a sequence of nodes or, equivalently,

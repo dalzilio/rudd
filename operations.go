@@ -44,13 +44,13 @@ func (b *BDD) Makeset(varset []int) Node {
 	// }
 	// return res
 	res := 1
-	b.initref()
+	b.Initref()
 	for k := len(varset) - 1; k >= 0; k-- {
-		res = b.makenode(int32(varset[k]), 0, res)
-		b.pushref(res)
+		res = b.Makenode(int32(varset[k]), 0, res)
+		b.Pushref(res)
 	}
-	b.popref(len(varset))
-	return b.retnode(res)
+	b.Popref(len(varset))
+	return b.Retnode(res)
 }
 
 // Makecube returns a node corresponding to the conjunction (the cube) of all
@@ -68,32 +68,32 @@ func (b *BDD) Makecube(varset []int, polarity []bool) Node {
 		if len(polarity) != int(b.varnum) {
 			return b.seterror("wrong size for polarity in Makecube")
 		}
-		b.initref()
+		b.Initref()
 		for k := len(polarity) - 1; k >= 0; k-- {
 			if polarity[k] {
-				res = b.makenode(int32(k), 0, res)
+				res = b.Makenode(int32(k), 0, res)
 			} else {
-				res = b.makenode(int32(k), res, 0)
+				res = b.Makenode(int32(k), res, 0)
 			}
-			b.pushref(res)
+			b.Pushref(res)
 		}
-		b.popref(len(polarity))
-		return b.retnode(res)
+		b.Popref(len(polarity))
+		return b.Retnode(res)
 	}
 	if len(varset) != len(polarity) {
 		return b.seterror("wrong size for slices in Makecube")
 	}
-	b.initref()
+	b.Initref()
 	for k := len(polarity) - 1; k >= 0; k-- {
 		if polarity[k] {
-			res = b.makenode(int32(varset[k]), 0, res)
+			res = b.Makenode(int32(varset[k]), 0, res)
 		} else {
-			res = b.makenode(int32(varset[k]), res, 0)
+			res = b.Makenode(int32(varset[k]), res, 0)
 		}
-		b.pushref(res)
+		b.Pushref(res)
 	}
-	b.popref(len(polarity))
-	return b.retnode(res)
+	b.Popref(len(polarity))
+	return b.Retnode(res)
 }
 
 // Not returns the negation of the expression corresponding to node n; it
@@ -103,11 +103,11 @@ func (b *BDD) Not(n Node) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("Wrong operand in call to Not (%d)", *n)
 	}
-	b.initref()
-	b.pushref(*n)
+	b.Initref()
+	b.Pushref(*n)
 	res := b.not(*n)
-	b.popref(1)
-	return b.retnode(res)
+	b.Popref(1)
+	return b.Retnode(res)
 }
 
 func (b *BDD) not(n int) int {
@@ -121,10 +121,10 @@ func (b *BDD) not(n int) int {
 	if res := b.matchnot(n); res >= 0 {
 		return res
 	}
-	low := b.pushref(b.not(b.low(n)))
-	high := b.pushref(b.not(b.high(n)))
-	res := b.makenode(b.level(n), low, high)
-	b.popref(2)
+	low := b.Pushref(b.not(b.low(n)))
+	high := b.Pushref(b.not(b.high(n)))
+	res := b.Makenode(b.level(n), low, high)
+	b.Popref(2)
 	return b.setnot(n, res)
 }
 
@@ -151,12 +151,12 @@ func (b *BDD) Apply(n1, n2 Node, op Operator) Node {
 		return b.seterror("Wrong operand in call to Apply %s(n1: ..., n2: %d)", op, *n2)
 	}
 	b.applycache.op = int(op)
-	b.initref()
-	b.pushref(*n1)
-	b.pushref(*n2)
+	b.Initref()
+	b.Pushref(*n1)
+	b.Pushref(*n2)
 	res := b.apply(*n1, *n2)
-	b.popref(2)
-	return b.retnode(res)
+	b.Popref(2)
+	return b.Retnode(res)
 }
 
 func (b *BDD) apply(left int, right int) int {
@@ -283,21 +283,21 @@ func (b *BDD) apply(left int, right int) int {
 	rightlvl := b.level(right)
 	var res int
 	if leftlvl == rightlvl {
-		low := b.pushref(b.apply(b.low(left), b.low(right)))
-		high := b.pushref(b.apply(b.high(left), b.high(right)))
-		res = b.makenode(leftlvl, low, high)
+		low := b.Pushref(b.apply(b.low(left), b.low(right)))
+		high := b.Pushref(b.apply(b.high(left), b.high(right)))
+		res = b.Makenode(leftlvl, low, high)
 	} else {
 		if leftlvl < rightlvl {
-			low := b.pushref(b.apply(b.low(left), right))
-			high := b.pushref(b.apply(b.high(left), right))
-			res = b.makenode(leftlvl, low, high)
+			low := b.Pushref(b.apply(b.low(left), right))
+			high := b.Pushref(b.apply(b.high(left), right))
+			res = b.Makenode(leftlvl, low, high)
 		} else {
-			low := b.pushref(b.apply(left, b.low(right)))
-			high := b.pushref(b.apply(left, b.high(right)))
-			res = b.makenode(rightlvl, low, high)
+			low := b.Pushref(b.apply(left, b.low(right)))
+			high := b.Pushref(b.apply(left, b.high(right)))
+			res = b.Makenode(rightlvl, low, high)
 		}
 	}
-	b.popref(2)
+	b.Popref(2)
 	return b.setapply(left, right, res)
 }
 
@@ -313,13 +313,13 @@ func (b *BDD) Ite(f, g, h Node) Node {
 	if b.checkptr(h) != nil {
 		return b.seterror("Wrong operand in call to Ite (h: %d)", *h)
 	}
-	b.initref()
-	b.pushref(*f)
-	b.pushref(*g)
-	b.pushref(*h)
+	b.Initref()
+	b.Pushref(*f)
+	b.Pushref(*g)
+	b.Pushref(*h)
 	res := b.ite(*f, *g, *h)
-	b.popref(3)
-	return b.retnode(res)
+	b.Popref(3)
+	return b.Retnode(res)
 }
 
 // iteLow returns p if p is strictly higher than q or r, otherwise it returns
@@ -381,10 +381,10 @@ func (b *BDD) ite(f, g, h int) int {
 	p := b.level(f)
 	q := b.level(g)
 	r := b.level(h)
-	low := b.pushref(b.ite(b.iteLow(p, q, r, f), b.iteLow(q, p, r, g), b.iteLow(r, p, q, h)))
-	high := b.pushref(b.ite(b.iteHigh(p, q, r, f), b.iteHigh(q, p, r, g), b.iteHigh(r, p, q, h)))
-	res := b.makenode(min3(p, q, r), low, high)
-	b.popref(2)
+	low := b.Pushref(b.ite(b.iteLow(p, q, r, f), b.iteLow(q, p, r, g), b.iteLow(r, p, q, h)))
+	high := b.Pushref(b.ite(b.iteHigh(p, q, r, f), b.iteHigh(q, p, r, g), b.iteHigh(r, p, q, h)))
+	res := b.Makenode(min3(p, q, r), low, high)
+	b.Popref(2)
 	return b.setite(f, g, h, res)
 }
 
@@ -407,12 +407,12 @@ func (b *BDD) Exist(n, varset Node) Node {
 
 	b.quantcache.id = cacheidEXIST
 	b.applycache.op = int(OPor)
-	b.initref()
-	b.pushref(*n)
-	b.pushref(*varset)
+	b.Initref()
+	b.Pushref(*n)
+	b.Pushref(*varset)
 	res := b.quant(*n, *varset)
-	b.popref(2)
-	return b.retnode(res)
+	b.Popref(2)
+	return b.Retnode(res)
 }
 
 func (b *BDD) quant(n, varset int) int {
@@ -423,15 +423,15 @@ func (b *BDD) quant(n, varset int) int {
 	if res := b.matchquant(n, varset); res >= 0 {
 		return res
 	}
-	low := b.pushref(b.quant(b.low(n), varset))
-	high := b.pushref(b.quant(b.high(n), varset))
+	low := b.Pushref(b.quant(b.low(n), varset))
+	high := b.Pushref(b.quant(b.high(n), varset))
 	var res int
 	if b.quantset[b.level(n)] == b.quantsetID {
 		res = b.apply(low, high)
 	} else {
-		res = b.makenode(b.level(n), low, high)
+		res = b.Makenode(b.level(n), low, high)
 	}
-	b.popref(2)
+	b.Popref(2)
 	return b.setquant(n, varset, res)
 }
 
@@ -467,13 +467,13 @@ func (b *BDD) AppEx(n1, n2 Node, op Operator, varset Node) Node {
 	b.appexcache.op = int(op)
 	b.appexcache.id = (*varset << 2) | b.appexcache.op
 	b.quantcache.id = (b.appexcache.id << 3) | cacheidAPPEX
-	b.initref()
-	b.pushref(*n1)
-	b.pushref(*n2)
-	b.pushref(*varset)
+	b.Initref()
+	b.Pushref(*n1)
+	b.Pushref(*n2)
+	b.Pushref(*varset)
 	res := b.appquant(*n1, *n2, *varset)
-	b.popref(3)
-	return b.retnode(res)
+	b.Popref(3)
+	return b.Retnode(res)
 }
 
 func (b *BDD) appquant(left, right, varset int) int {
@@ -558,33 +558,33 @@ func (b *BDD) appquant(left, right, varset int) int {
 	rightlvl := b.level(right)
 	var res int
 	if leftlvl == rightlvl {
-		low := b.pushref(b.appquant(b.low(left), b.low(right), varset))
-		high := b.pushref(b.appquant(b.high(left), b.high(right), varset))
+		low := b.Pushref(b.appquant(b.low(left), b.low(right), varset))
+		high := b.Pushref(b.appquant(b.high(left), b.high(right), varset))
 		if b.quantset[leftlvl] == b.quantsetID {
 			res = b.apply(low, high)
 		} else {
-			res = b.makenode(leftlvl, low, high)
+			res = b.Makenode(leftlvl, low, high)
 		}
 	} else {
 		if leftlvl < rightlvl {
-			low := b.pushref(b.appquant(b.low(left), right, varset))
-			high := b.pushref(b.appquant(b.high(left), right, varset))
+			low := b.Pushref(b.appquant(b.low(left), right, varset))
+			high := b.Pushref(b.appquant(b.high(left), right, varset))
 			if b.quantset[leftlvl] == b.quantsetID {
 				res = b.apply(low, high)
 			} else {
-				res = b.makenode(leftlvl, low, high)
+				res = b.Makenode(leftlvl, low, high)
 			}
 		} else {
-			low := b.pushref(b.appquant(left, b.low(right), varset))
-			high := b.pushref(b.appquant(left, b.high(right), varset))
+			low := b.Pushref(b.appquant(left, b.low(right), varset))
+			high := b.Pushref(b.appquant(left, b.high(right), varset))
 			if b.quantset[rightlvl] == b.quantsetID {
 				res = b.apply(low, high)
 			} else {
-				res = b.makenode(rightlvl, low, high)
+				res = b.Makenode(rightlvl, low, high)
 			}
 		}
 	}
-	b.popref(2)
+	b.Popref(2)
 	return b.setappex(left, right, res)
 }
 
@@ -594,11 +594,11 @@ func (b *BDD) Replace(n Node, r Replacer) Node {
 	if b.checkptr(n) != nil {
 		return b.seterror("wrong operand in call to Replace (%d)", *n)
 	}
-	b.initref()
-	b.pushref(*n)
+	b.Initref()
+	b.Pushref(*n)
 	b.replacecache.id = r.Id()
-	res := b.retnode(b.replace(*n, r))
-	b.popref(1)
+	res := b.Retnode(b.replace(*n, r))
+	b.Popref(1)
 	return res
 }
 
@@ -610,17 +610,17 @@ func (b *BDD) replace(n int, r Replacer) int {
 	if res := b.matchreplace(n); res >= 0 {
 		return res
 	}
-	low := b.pushref(b.replace(b.low(n), r))
-	high := b.pushref(b.replace(b.high(n), r))
+	low := b.Pushref(b.replace(b.low(n), r))
+	high := b.Pushref(b.replace(b.high(n), r))
 	res := b.correctify(image, low, high)
-	b.popref(2)
+	b.Popref(2)
 	return b.setreplace(n, res)
 }
 
 func (b *BDD) correctify(level int32, low, high int) int {
 	/* FIXME: we do not use the cache here */
 	if (level < b.level(low)) && (level < b.level(high)) {
-		return b.makenode(level, low, high)
+		return b.Makenode(level, low, high)
 	}
 
 	if (level == b.level(low)) || (level == b.level(high)) {
@@ -629,25 +629,25 @@ func (b *BDD) correctify(level int32, low, high int) int {
 	}
 
 	if b.level(low) == b.level(high) {
-		left := b.pushref(b.correctify(level, b.low(low), b.low(high)))
-		right := b.pushref(b.correctify(level, b.high(low), b.high(high)))
-		res := b.makenode(b.level(low), left, right)
-		b.popref(2)
+		left := b.Pushref(b.correctify(level, b.low(low), b.low(high)))
+		right := b.Pushref(b.correctify(level, b.high(low), b.high(high)))
+		res := b.Makenode(b.level(low), left, right)
+		b.Popref(2)
 		return res
 	}
 
 	if b.level(low) < b.level(high) {
-		left := b.pushref(b.correctify(level, b.low(low), high))
-		right := b.pushref(b.correctify(level, b.high(low), high))
-		res := b.makenode(b.level(low), left, right)
-		b.popref(2)
+		left := b.Pushref(b.correctify(level, b.low(low), high))
+		right := b.Pushref(b.correctify(level, b.high(low), high))
+		res := b.Makenode(b.level(low), left, right)
+		b.Popref(2)
 		return res
 	}
 
-	left := b.pushref(b.correctify(level, low, b.low(high)))
-	right := b.pushref(b.correctify(level, low, b.high(high)))
-	res := b.makenode(b.level(high), left, right)
-	b.popref(2)
+	left := b.Pushref(b.correctify(level, low, b.low(high)))
+	right := b.Pushref(b.correctify(level, low, b.high(high)))
+	res := b.Makenode(b.level(high), left, right)
+	b.Popref(2)
 	return res
 }
 

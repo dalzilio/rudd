@@ -81,7 +81,7 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 	b.varset = make([][2]int, varnum)
 	// We also initialize the refstack.
 	b.refstack = make([]int, 0, 2*varnum+4)
-	b.initref()
+	b.Initref()
 	b.error = nil
 	impl := &tables{}
 	impl.minfreenodes = config.minfreenodes
@@ -121,14 +121,14 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 			return nil, b.error
 		}
 		impl.nodes[v0].refcou = _MAXREFCOUNT
-		b.pushref(v0)
+		b.Pushref(v0)
 		v1, _ := impl.makenode(int32(k), 1, 0, nil)
 		if v1 < 0 {
 			b.seterror("cannot allocate new variable %d in setVarnum", k)
 			return nil, b.error
 		}
 		impl.nodes[v1].refcou = _MAXREFCOUNT
-		b.popref(1)
+		b.Popref(1)
 		b.varset[k] = [2]int{v0, v1}
 	}
 	impl.gcstat.history = []gcpoint{}
