@@ -33,16 +33,24 @@ func (b *BDD) Scanset(n Node) []int {
 // It returns False and sets the error condition in b if one of the variables is
 // outside the scope of the BDD (see documentation for function *Ithvar*).
 func (b *BDD) Makeset(varset []int) Node {
-	res := bddone
-	for _, level := range varset {
-		// FIXME: should find a way to do it without adding references
-		tmp := b.Apply(res, b.Ithvar(level), OPand)
-		if b.error != nil {
-			return bddzero
-		}
-		res = tmp
+	// res := bddone
+	// for _, level := range varset {
+	// 	// FIXME: should find a way to do it without adding references
+	// 	tmp := b.Apply(res, b.Ithvar(level), OPand)
+	// 	if b.error != nil {
+	// 		return bddzero
+	// 	}
+	// 	res = tmp
+	// }
+	// return res
+	res := 1
+	b.initref()
+	for k := len(varset) - 1; k >= 0; k-- {
+		res = b.makenode(int32(varset[k]), 0, res)
+		b.pushref(res)
 	}
-	return res
+	b.popref(len(varset))
+	return b.retnode(res)
 }
 
 // Makecube returns a node corresponding to the conjunction (the cube) of all
@@ -52,7 +60,8 @@ func (b *BDD) Makeset(varset []int) Node {
 // and polarity are different. As a special case, when varset is empty
 // (len(varset) == 0), we consider that polarity operates over all the variables
 // in b (and therefore we expect that len(polarity) == Varnum). This method is
-// more efficient than using Apply and And successively.
+// more efficient than using Apply iteratively. The computation may panic if
+// indices in varset are not sorted by order of increasing values.
 func (b *BDD) Makecube(varset []int, polarity []bool) Node {
 	res := 1
 	if len(varset) == 0 {
@@ -77,9 +86,9 @@ func (b *BDD) Makecube(varset []int, polarity []bool) Node {
 	b.initref()
 	for k := len(polarity) - 1; k >= 0; k-- {
 		if polarity[k] {
-			res = b.makenode(int32(k), 0, res)
+			res = b.makenode(int32(varset[k]), 0, res)
 		} else {
-			res = b.makenode(int32(k), res, 0)
+			res = b.makenode(int32(varset[k]), res, 0)
 		}
 		b.pushref(res)
 	}
