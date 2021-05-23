@@ -23,7 +23,7 @@ func Example_basic() {
 	// n2 == x1 | !x3 | x4
 	n2 := bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4))
 	// n3 == ∃ x2,x3,x5 . (n2 & x3)
-	n3 := bdd.AndExist(n1, n2, bdd.Ithvar(3))
+	n3 := bdd.AndExist(n2, bdd.Ithvar(3), n1)
 	// You can print the result or export a BDD in Graphviz's DOT format
 	log.Print("\n" + bdd.Stats())
 	fmt.Printf("Number of sat. assignments is %s\n", bdd.Satcount(n3))
@@ -37,9 +37,8 @@ func Example_basic() {
 func Example_allsat() {
 	bdd, _ := rudd.New(5)
 	// n == ∃ x2,x3 . (x1 | !x3 | x4) & x3
-	n := bdd.AndExist(bdd.Makeset([]int{2, 3}),
-		bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
-		bdd.Ithvar(3))
+	n := bdd.AndExist(bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
+		bdd.Ithvar(3), bdd.Makeset([]int{2, 3}))
 	acc := new(int)
 	bdd.Allsat(func(varset []int) error {
 		*acc++
@@ -55,9 +54,8 @@ func Example_allsat() {
 // Allnodes, that counts the number of active nodes in the whole BDD.
 func Example_allnodes() {
 	bdd, _ := rudd.New(5)
-	n := bdd.AndExist(bdd.Makeset([]int{2, 3}),
-		bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
-		bdd.Ithvar(3))
+	n := bdd.AndExist(bdd.Or(bdd.Ithvar(1), bdd.NIthvar(3), bdd.Ithvar(4)),
+		bdd.Ithvar(3), bdd.Makeset([]int{2, 3}))
 	acc := new(int)
 	count := func(id, level, low, high int) error {
 		*acc++

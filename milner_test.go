@@ -80,7 +80,7 @@ func milner(tb testing.TB, fast bool, varnum int, options ...func(*configs)) (*B
 		count++
 		prev := R
 		if fast {
-			R = bdd.Or(bdd.Replace(bdd.AndExist(normvar, R, T), replacer), R)
+			R = bdd.Or(bdd.Replace(bdd.AndExist(R, T, normvar), replacer), R)
 		} else {
 			R = bdd.Or(bdd.Replace(bdd.Exist(bdd.And(R, T), normvar), replacer), R)
 		}

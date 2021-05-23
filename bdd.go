@@ -360,7 +360,7 @@ func (b *BDD) Equal(n1, n2 Node) bool {
 
 // AndExist returns the "relational composition" of two nodes with respect to
 // varset, meaning the result of (∃ varset . n1 & n2).
-func (b *BDD) AndExist(varset, n1, n2 Node) Node {
+func (b *BDD) AndExist(n1, n2, varset Node) Node {
 	return b.AppEx(n1, n2, OPand, varset)
 }
 
