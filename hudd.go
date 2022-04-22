@@ -2,6 +2,7 @@
 //
 // MIT License
 
+//go:build !buddy
 // +build !buddy
 
 package rudd
@@ -9,6 +10,7 @@ package rudd
 import (
 	"fmt"
 	"log"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -19,6 +21,7 @@ import (
 // space but a benefit is that we can easily migrate to a concurrency-safe
 // hashmap if we want to test concurrent data structures.
 type tables struct {
+	sync.RWMutex
 	nodes         []huddnode             // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	unique        map[[huddsize]byte]int // Unicity table, used to associate each triplet to a single node
 	freenum       int                    // Number of free nodes
@@ -41,14 +44,20 @@ type huddnode struct {
 }
 
 func (b *tables) ismarked(n int) bool {
+	b.RLock()
+	defer b.RUnlock()
 	return (b.nodes[n].refcou & 0x200000) != 0
 }
 
 func (b *tables) marknode(n int) {
+	b.RLock()
+	defer b.RUnlock()
 	b.nodes[n].refcou |= 0x200000
 }
 
 func (b *tables) unmarknode(n int) {
+	b.RLock()
+	defer b.RUnlock()
 	b.nodes[n].refcou &= 0x1FFFFF
 }
 
@@ -133,6 +142,8 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 	}
 	impl.gcstat.history = []gcpoint{}
 	impl.nodefinalizer = func(n *int) {
+		b.Lock()
+		defer b.Unlock()
 		if _DEBUG {
 			atomic.AddUint64(&(impl.gcstat.calledfinalizers), 1)
 			if _LOGLEVEL > 2 {
@@ -189,6 +200,8 @@ func (b *tables) nodehash(level int32, low, high int) (int, bool) {
 // unused slot, except when freenum is 0, in which case it is also 0.
 
 func (b *tables) setnode(level int32, low int, high int, count int32) int {
+	b.Lock()
+	defer b.Unlock()
 	b.huddhash(level, low, high)
 	b.freenum--
 	b.unique[b.hbuff] = b.freepos
@@ -204,22 +217,32 @@ func (b *tables) delnode(hn huddnode) {
 }
 
 func (b *tables) size() int {
+	b.RLock()
+	defer b.RUnlock()
 	return len(b.nodes)
 }
 
 func (b *tables) level(n int) int32 {
+	b.RLock()
+	defer b.RUnlock()
 	return b.nodes[n].level
 }
 
 func (b *tables) low(n int) int {
+	b.RLock()
+	defer b.RUnlock()
 	return b.nodes[n].low
 }
 
 func (b *tables) high(n int) int {
+	b.RLock()
+	defer b.RUnlock()
 	return b.nodes[n].high
 }
 
 func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
+	b.RLock()
+	defer b.RUnlock()
 	for _, v := range n {
 		b.markrec(*v)
 	}
@@ -244,6 +267,8 @@ func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) 
 }
 
 func (b *tables) allnodes(f func(id, level, low, high int) error) error {
+	b.RLock()
+	defer b.RUnlock()
 	// if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
 	// 	return err
 	// }
@@ -262,6 +287,8 @@ func (b *tables) allnodes(f func(id, level, low, high int) error) error {
 
 // stats returns information about the implementation
 func (b *tables) stats() string {
+	b.RLock()
+	defer b.RUnlock()
 	res := "Impl.:      Hudd\n"
 	res += fmt.Sprintf("Allocated:  %d (%s)\n", len(b.nodes), humanSize(len(b.nodes), unsafe.Sizeof(huddnode{})))
 	res += fmt.Sprintf("Produced:   %d\n", b.produced)
