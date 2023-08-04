@@ -241,8 +241,6 @@ func (b *tables) high(n int) int {
 }
 
 func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) error {
-	b.RLock()
-	defer b.RUnlock()
 	for _, v := range n {
 		b.markrec(*v)
 	}
@@ -254,7 +252,16 @@ func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) 
 	// 	b.unmarkall()
 	// 	return err
 	// }
-	for k := range b.nodes {
+	b.RLock()
+	count := len(b.nodes)
+	b.RUnlock()
+
+	for k := 0; k < count; k++ {
+		b.RLock()
+		if k >= len(b.nodes) {
+			break
+		}
+		b.RUnlock()
 		if b.ismarked(k) {
 			b.unmarknode(k)
 			if err := f(k, int(b.nodes[k].level), b.nodes[k].low, b.nodes[k].high); err != nil {
@@ -267,15 +274,23 @@ func (b *tables) allnodesfrom(f func(id, level, low, high int) error, n []Node) 
 }
 
 func (b *tables) allnodes(f func(id, level, low, high int) error) error {
-	b.RLock()
-	defer b.RUnlock()
 	// if err := f(0, int(b.nodes[0].level), 0, 0); err != nil {
 	// 	return err
 	// }
 	// if err := f(1, int(b.nodes[1].level), 1, 1); err != nil {
 	// 	return err
 	// }
-	for k, v := range b.nodes {
+	b.RLock()
+	count := len(b.nodes)
+	b.RUnlock()
+
+	for k := 0; k < count; k++ {
+		b.RLock()
+		if k >= len(b.nodes) {
+			break
+		}
+		v := b.nodes[k]
+		b.RUnlock()
 		if v.low != -1 {
 			if err := f(k, int(v.level), v.low, v.high); err != nil {
 				return err
