@@ -2,6 +2,7 @@
 //
 // MIT License
 
+//go:build buddy
 // +build buddy
 
 package rudd
@@ -9,6 +10,7 @@ package rudd
 import (
 	"fmt"
 	"log"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -17,17 +19,18 @@ import (
 // Diagrams based on the data structures and algorithms found in the BuDDy
 // library.
 type tables struct {
-	nodes         []buddynode // List of all the BDD nodes. Constants are always kept at index 0 and 1
-	freenum       int         // Number of free nodes
-	freepos       int         // First free node
-	produced      int         // Total number of new nodes ever produced
-	nodefinalizer interface{} // Finalizer used to decrement the ref count of external references
-	uniqueAccess  int         // accesses to the unique node table
-	uniqueChain   int         // iterations through the cache chains in the unique node table
-	uniqueHit     int         // entries actually found in the the unique node table
-	uniqueMiss    int         // entries not found in the the unique node table
-	gcstat                    // Information about garbage collections
-	configs                   // Configurable parameters
+	lifecycleMu   sync.RWMutex // Coordinates finalizers with node-table reclamation and resizing
+	nodes         []buddynode  // List of all the BDD nodes. Constants are always kept at index 0 and 1
+	freenum       int          // Number of free nodes
+	freepos       int          // First free node
+	produced      int          // Total number of new nodes ever produced
+	nodefinalizer interface{}  // Finalizer used to decrement the ref count of external references
+	uniqueAccess  int          // accesses to the unique node table
+	uniqueChain   int          // iterations through the cache chains in the unique node table
+	uniqueHit     int          // entries actually found in the the unique node table
+	uniqueMiss    int          // entries not found in the the unique node table
+	gcstat                     // Information about garbage collections
+	configs                    // Configurable parameters
 }
 
 type buddynode struct {
@@ -126,7 +129,7 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 				log.Printf("dec refcou %d\n", *n)
 			}
 		}
-		impl.nodes[*n].refcou--
+		impl.release(*n)
 	}
 	for k := 0; k < config.varnum; k++ {
 		v0, _ := impl.makenode(int32(k), 0, 1, nil)
@@ -218,8 +221,8 @@ func (b *tables) stats() string {
 	res += "==============\n"
 	res += fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history))
 	if _DEBUG {
-		allocated := int(b.gcstat.setfinalizers)
-		reclaimed := int(b.gcstat.calledfinalizers)
+		allocated := int(atomic.LoadUint64(&b.gcstat.setfinalizers))
+		reclaimed := int(atomic.LoadUint64(&b.gcstat.calledfinalizers))
 		for _, g := range b.gcstat.history {
 			allocated += g.setfinalizers
 			reclaimed += g.calledfinalizers
