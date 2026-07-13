@@ -2,6 +2,7 @@
 //
 // MIT License
 
+//go:build buddy
 // +build buddy
 
 package rudd
@@ -16,7 +17,8 @@ import (
 // Retnode is a kernel function of the BDD package. Use it at your own risk.
 // Retnode returns a valid node from the value returned by a call to Makenode.
 func (b *tables) Retnode(n int) Node {
-	if n < 0 || n > len(b.nodes) {
+	retained, valid := b.retain(n)
+	if !valid {
 		if _DEBUG {
 			log.Panicf("unexpected error; b.retnode(%d) not valid\n", n)
 		}
@@ -29,8 +31,7 @@ func (b *tables) Retnode(n int) Node {
 		return bddone
 	}
 	x := n
-	if b.nodes[n].refcou < _MAXREFCOUNT {
-		b.nodes[n].refcou++
+	if retained {
 		runtime.SetFinalizer(&x, b.nodefinalizer)
 		if _DEBUG {
 			atomic.AddUint64(&(b.setfinalizers), 1)
@@ -104,6 +105,8 @@ func (b *tables) makenode(level int32, low, high int, refstack []int) (int, erro
 }
 
 func (b *tables) noderesize() error {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
 	if _LOGLEVEL > 0 {
 		log.Printf("start resize: %d\n", len(b.nodes))
 	}
@@ -178,6 +181,8 @@ func (b *tables) noderesize() error {
 // makenode, when there are no free positions available. Allocated nodes that
 // are not reclaimed do not move.
 func (b *tables) gbc(refstack []int) {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
 	if _LOGLEVEL > 0 {
 		log.Println("starting GC")
 	}
@@ -194,17 +199,17 @@ func (b *tables) gbc(refstack []int) {
 
 	// we append the current stats to the GC history
 	if _DEBUG {
+		setfinalizers := atomic.SwapUint64(&b.gcstat.setfinalizers, 0)
+		calledfinalizers := atomic.SwapUint64(&b.gcstat.calledfinalizers, 0)
 		b.gcstat.history = append(b.gcstat.history, gcpoint{
 			nodes:            len(b.nodes),
 			freenodes:        b.freenum,
-			setfinalizers:    int(b.gcstat.setfinalizers),
-			calledfinalizers: int(b.gcstat.calledfinalizers),
+			setfinalizers:    int(setfinalizers),
+			calledfinalizers: int(calledfinalizers),
 		})
 		if _LOGLEVEL > 0 {
-			log.Printf("runtime.GC() reclaimed %d references\n", b.gcstat.calledfinalizers)
+			log.Printf("runtime.GC() reclaimed %d references\n", calledfinalizers)
 		}
-		b.gcstat.setfinalizers = 0
-		b.gcstat.calledfinalizers = 0
 	} else {
 		b.gcstat.history = append(b.gcstat.history, gcpoint{
 			nodes:     len(b.nodes),
@@ -218,7 +223,7 @@ func (b *tables) gbc(refstack []int) {
 	// we also protect nodes with a positive refcount (and therefore also the
 	// ones with a MAXREFCOUNT, such has variables)
 	for k := range b.nodes {
-		if b.nodes[k].refcou > 0 {
+		if b.hasReferences(k) {
 			b.markrec(k)
 		}
 		b.nodes[k].hash = 0
