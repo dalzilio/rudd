@@ -22,6 +22,7 @@ import (
 // hashmap if we want to test concurrent data structures.
 type tables struct {
 	sync.RWMutex
+	lifecycleMu   sync.RWMutex           // Coordinates finalizers with node-table reclamation and resizing
 	nodes         []huddnode             // List of all the BDD nodes. Constants are always kept at index 0 and 1
 	unique        map[[huddsize]byte]int // Unicity table, used to associate each triplet to a single node
 	freenum       int                    // Number of free nodes
@@ -44,21 +45,27 @@ type huddnode struct {
 }
 
 func (b *tables) ismarked(n int) bool {
-	b.RLock()
-	defer b.RUnlock()
-	return (b.nodes[n].refcou & 0x200000) != 0
+	return atomic.LoadInt32(&b.nodes[n].refcou)&0x200000 != 0
 }
 
 func (b *tables) marknode(n int) {
-	b.RLock()
-	defer b.RUnlock()
-	b.nodes[n].refcou |= 0x200000
+	refcou := &b.nodes[n].refcou
+	for {
+		current := atomic.LoadInt32(refcou)
+		if current&0x200000 != 0 || atomic.CompareAndSwapInt32(refcou, current, current|0x200000) {
+			return
+		}
+	}
 }
 
 func (b *tables) unmarknode(n int) {
-	b.RLock()
-	defer b.RUnlock()
-	b.nodes[n].refcou &= 0x1FFFFF
+	refcou := &b.nodes[n].refcou
+	for {
+		current := atomic.LoadInt32(refcou)
+		if current&0x200000 == 0 || atomic.CompareAndSwapInt32(refcou, current, current&0x1FFFFF) {
+			return
+		}
+	}
 }
 
 // New returns a new BDD based on an implementation selected with the build tag;
@@ -142,15 +149,13 @@ func New(varnum int, options ...func(*configs)) (*BDD, error) {
 	}
 	impl.gcstat.history = []gcpoint{}
 	impl.nodefinalizer = func(n *int) {
-		b.Lock()
-		defer b.Unlock()
 		if _DEBUG {
 			atomic.AddUint64(&(impl.gcstat.calledfinalizers), 1)
 			if _LOGLEVEL > 2 {
 				log.Printf("dec refcou %d\n", *n)
 			}
 		}
-		impl.nodes[*n].refcou--
+		impl.release(*n)
 	}
 	b.tables = impl
 	b.cacheinit(config)
@@ -313,8 +318,8 @@ func (b *tables) stats() string {
 	res += "==============\n"
 	res += fmt.Sprintf("# of GC:    %d\n", len(b.gcstat.history))
 	if _DEBUG {
-		allocated := int(b.gcstat.setfinalizers)
-		reclaimed := int(b.gcstat.calledfinalizers)
+		allocated := int(atomic.LoadUint64(&b.gcstat.setfinalizers))
+		reclaimed := int(atomic.LoadUint64(&b.gcstat.calledfinalizers))
 		for _, g := range b.gcstat.history {
 			allocated += g.setfinalizers
 			reclaimed += g.calledfinalizers
