@@ -12,7 +12,7 @@ import (
 // milner is an example of using BDD for state space computation. It is
 // directly adapted from the examples in the Buddy distribution. It computes the
 // reachable state of a system composed of N cyclers, with an initial BDD size
-// of size. For this system, we have an anlytical formula to compute the size of
+// of size. For this system, we have an analytical formula to compute the size of
 // the state space.
 func milner(tb testing.TB, fast bool, varnum int, options ...func(*configs)) (*BDD, Node) {
 	bdd, err := New(varnum*6, options...)
@@ -128,7 +128,7 @@ func TestMilner(t *testing.T) {
 
 func TestMilner80(t *testing.T) {
 	N := 80
-	tt := func(buddy bool) {
+	tt := func() {
 		bdd, R := milner(t, true, N, Nodesize(1000000), Cachesize(250000), Cacheratio(25))
 		expected := big.NewInt(int64(N))
 		pow := big.NewInt(0)
@@ -139,8 +139,7 @@ func TestMilner80(t *testing.T) {
 			t.Errorf("Error in Milner(%d), expected %s, actual %s", N, expected, result)
 		}
 	}
-	tt(true)
-	tt(false)
+	tt()
 }
 
 func BenchmarkMilner150(b *testing.B) {
